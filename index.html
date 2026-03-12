@@ -1200,7 +1200,7 @@ let llmStatus = { available: false, model: null, embed_model: null };
 
 async function checkLlmAvailability() {
   try {
-    const r = await fetch('/llm_status');
+    const r = await ('/llm_status');
     llmStatus = await r.json();
   } catch { llmStatus = { available: false }; }
 
@@ -1363,7 +1363,7 @@ async function runSemanticReview() {
     let ok = false;
     let chunkUpgrades = 0;
     try {
-      const resp = await fetch('/llm_check_batch', {
+      const resp = await ('/llm_check_batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1655,7 +1655,7 @@ const llmCache = {
 // ─── Data loading ─────────────────────────────────────────────────────────────
 async function loadData() {
   try {
-    const resp = await fetch('/canonical_tasks.json');
+    const resp = await fetch('canonical_tasks.json');
     if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
     const tasks = await resp.json();
     for (const t of tasks) {
