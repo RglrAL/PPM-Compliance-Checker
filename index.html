@@ -1,0 +1,2978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PPM Compliance Checker</title>
+<!-- Apply dark mode before CSS paint to prevent flash -->
+<script>try{if(localStorage.getItem('ppm_dark')==='1')document.documentElement.classList.add('dark')}catch(e){}</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; background: #f1f5f9; min-height: 100vh; padding: 20px 16px; color: #1e293b; }
+
+  /* ── Page wrapper ── */
+  .page-wrap { max-width: 1200px; margin: 0 auto; }
+
+  /* ── Header ── */
+  .header { background: linear-gradient(135deg, #0f2a47 0%, #1a3a5c 55%, #1b5272 100%);
+            color: white; border-radius: 14px; padding: 20px 26px; margin-bottom: 16px;
+            display: flex; justify-content: space-between; align-items: center;
+            flex-wrap: wrap; gap: 12px; box-shadow: 0 4px 24px rgba(15,42,71,.28); }
+  .header-text .sub { font-size: 10px; letter-spacing: .14em; opacity: .5; text-transform: uppercase; margin-bottom: 5px; font-weight: 500; }
+  .header-text h1 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 3px; }
+  .header-text p { font-size: 12px; opacity: .6; }
+  .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .cb-toggle { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); color: white; font-size: 11px; padding: 7px 14px; border-radius: 8px; cursor: pointer; white-space: nowrap; font-weight: 500; transition: background .15s; font-family: inherit; }
+  .cb-toggle:hover { background: rgba(255,255,255,.22); }
+
+  /* ── Grid (kept for any remaining uses) ── */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+
+  /* ── Cards ── */
+  .card { background: white; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04); }
+  .card-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #1a3a5c; margin-bottom: 10px; }
+  .card p { font-size: 12px; color: #64748b; margin-bottom: 10px; }
+  select { width: 100%; padding: 8px 10px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 12px; margin-bottom: 10px; background: white; font-family: inherit; color: #334155; cursor: pointer; transition: border-color .15s; }
+  select:focus { outline: none; border-color: #1a6b8a; box-shadow: 0 0 0 3px rgba(26,107,138,.1); }
+
+  /* ── System picker ── */
+  .sys-picker { background: white; border-radius: 12px; padding: 18px 20px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04); margin-bottom: 12px; }
+  .sys-picker-lead { font-size: 12px; color: #64748b; margin-bottom: 14px; }
+  .sys-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 9px; margin-bottom: 14px; }
+  @media(max-width:800px){ .sys-grid { grid-template-columns: repeat(4,1fr); } }
+  @media(max-width:520px){ .sys-grid { grid-template-columns: repeat(2,1fr); } }
+  .sys-tile { display: flex; flex-direction: column; align-items: center; padding: 13px 8px 11px;
+              border: 2px solid #edf0f5; border-radius: 12px; cursor: pointer; background: white;
+              transition: border-color .18s, box-shadow .18s, transform .2s cubic-bezier(.34,1.56,.64,1);
+              user-select: none; outline: none; }
+  .sys-tile:hover  { border-color: var(--c,#1a6b8a); transform: translateY(-2px); box-shadow: 0 5px 14px rgba(0,0,0,.09); }
+  .sys-tile:focus  { border-color: var(--c,#1a6b8a); box-shadow: 0 0 0 3px rgba(26,107,138,.18); }
+  .sys-tile.active { border-color: transparent; background: linear-gradient(140deg,#1a3a5c 0%,#1a6b8a 100%);
+                     transform: translateY(-2px); box-shadow: 0 7px 20px rgba(26,58,92,.28); }
+  .sys-icon { width: 46px; height: 46px; border-radius: 11px; background: var(--b,#e8f3fb); color: var(--c,#1a6b8a);
+              display: flex; align-items: center; justify-content: center; margin-bottom: 9px;
+              transition: background .18s, color .18s; flex-shrink: 0; }
+  .sys-icon svg { width: 26px; height: 26px; }
+  .sys-tile.active .sys-icon { background: rgba(255,255,255,.18); color: white; }
+  .sys-name { font-size: 9.5px; font-weight: 700; text-align: center; line-height: 1.35; color: #334155;
+              text-transform: uppercase; letter-spacing: .04em; transition: color .18s; }
+  .sys-tile.active .sys-name { color: rgba(255,255,255,.92); }
+  .ref-box { font-size: 11px; color: #64748b; line-height: 1.8; background: #f8fafc; border-radius: 8px; padding: 10px 12px; border: 1px solid #e2e8f0; }
+  .ref-box .ref-title { color: #1a3a5c; font-weight: 700; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .08em; font-size: 9px; }
+
+  /* ── Contract editor ── */
+  .textarea-wrap { position: relative; }
+  textarea { width: 100%; height: 150px; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; font-size: 11.5px; resize: vertical; font-family: 'Fira Code', 'Courier New', monospace; line-height: 1.65; color: #334155; transition: border-color .15s; }
+  textarea:focus { outline: none; border-color: #1a6b8a; box-shadow: 0 0 0 3px rgba(26,107,138,.1); }
+  .expand-btn { position: absolute; bottom: 9px; right: 9px; background: rgba(15,42,71,.8); color: white; border: none; border-radius: 6px; font-size: 10px; padding: 4px 9px; cursor: pointer; opacity: .75; transition: opacity .15s; font-family: inherit; }
+  .expand-btn:hover { opacity: 1; }
+  .quote-ref-row { display:flex; align-items:center; gap:8px; margin-top:6px; }
+  .quote-ref-label { font-size:12px; color:#64748b; white-space:nowrap; flex-shrink:0; }
+  .quote-ref-input { flex:1; font-size:12px; padding:5px 10px; border:1px solid #d1d5db; border-radius:6px; font-family:inherit; color:#334155; background:#f8fafc; min-width:0; }
+  .quote-ref-input:focus { outline:none; border-color:#4f46e5; background:white; }
+
+  /* ── Drop zone ── */
+  .drop-zone { position: relative; border: 2px dashed #b0c8e8; border-radius: 10px;
+               background: #f4f8fd; padding: 22px 16px 18px; margin-bottom: 10px;
+               text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+  .drop-zone:hover, .drop-zone.dz-hover { border-color: #1a6b8a; background: #e8f3fb; }
+  .drop-zone.dz-over  { border-color: #1a6b8a; background: #d6ecfa; border-style: solid; }
+  .drop-zone.dz-ok    { border-color: #16a34a; background: #f0fdf4; border-style: solid; }
+  .drop-zone.dz-error { border-color: #ef4444; background: #fef2f2; border-style: solid; }
+  .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .dz-icon  { font-size: 28px; line-height: 1; margin-bottom: 6px; pointer-events: none; }
+  .dz-label { font-size: 13px; font-weight: 600; color: #1a6b8a; margin-bottom: 3px; pointer-events: none; }
+  .dz-sub   { font-size: 11px; color: #7a9ab5; pointer-events: none; }
+  .dz-filename { font-size: 12px; font-weight: 600; color: #15803d; margin-top: 4px; pointer-events: none; }
+  .upload-status { font-size: 11px; color: #15803d; margin-bottom: 8px; display: none;
+                   padding: 5px 10px; background: #f0fdf4; border-radius: 7px; border: 1px solid #86efac; font-weight: 500; }
+  .upload-status.error { color: #991b1b; background: #fef2f2; border-color: #fca5a5; }
+  .upload-loading { font-size: 11px; color: #0369a1; margin-bottom: 8px; display: none;
+                    padding: 5px 10px; background: #f0f9ff; border-radius: 7px; border: 1px solid #bae6fd; }
+
+  /* ── Evidence panel ── */
+  .evidence-btn { font-size: 10px; color: #1a6b8a; background: none; border: none;
+                  cursor: pointer; padding: 0 0 0 6px; opacity: .65; white-space: nowrap; font-family: inherit; }
+  .evidence-btn:hover { opacity: 1; text-decoration: underline; }
+  .evidence-row td { padding: 0 !important; border-bottom: 1px solid #e2e8f0 !important; }
+  .evidence-panel { padding: 8px 16px 12px; background: #f0f7ff; }
+  .evidence-snippet { font-size: 11px; color: #334155; line-height: 1.65; margin-bottom: 5px;
+                      padding: 6px 10px; background: white; border-radius: 6px;
+                      border-left: 3px solid #1a6b8a; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .evidence-snippet mark { background: #fef9c3; color: #334155; padding: 0 2px; border-radius: 2px; }
+  tr.row-hidden + tr.evidence-row { display: none !important; }
+
+  /* ── Full-screen editor modal ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.6); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(3px); }
+  .modal-box { background: white; border-radius: 14px; padding: 22px; width: 90vw; max-width: 1100px; height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .modal-title { font-size: 14px; font-weight: 700; color: #0f2a47; }
+  .modal-close { background: #f1f5f9; color: #475569; border: none; border-radius: 8px; padding: 8px 18px; font-size: 12px; cursor: pointer; font-weight: 600; transition: background .15s; font-family: inherit; }
+  .modal-close:hover { background: #e2e8f0; color: #1e293b; }
+  #contractTextFull { flex: 1; font-size: 12px; font-family: 'Fira Code', 'Courier New', monospace; resize: none; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 12px; line-height: 1.7; color: #334155; transition: border-color .15s; }
+  #contractTextFull:focus { outline: none; border-color: #1a6b8a; }
+
+  /* ── Run button ── */
+  .run-btn { width: 100%; padding: 15px; border-radius: 10px; border: none;
+             background: linear-gradient(135deg, #1a3a5c 0%, #1a6b8a 100%);
+             color: white; font-size: 14px; font-weight: 700; cursor: pointer;
+             margin-bottom: 14px; letter-spacing: .07em; text-transform: uppercase;
+             transition: opacity .18s, transform .18s, box-shadow .18s;
+             box-shadow: 0 4px 16px rgba(26,58,92,.3); font-family: inherit; }
+  .run-btn:disabled { background: #94a3b8; cursor: not-allowed; box-shadow: none; letter-spacing: .04em; }
+  .run-btn:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(26,58,92,.35); }
+  .run-btn:active:not(:disabled) { transform: translateY(0); }
+
+  /* ── Loading / progress ── */
+  .loading-banner { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 12px 16px; font-size: 12px; color: #0369a1; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; font-weight: 500; }
+  .spinner { width: 16px; height: 16px; border: 2.5px solid #bae6fd; border-top-color: #0369a1; border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-box { padding: 12px 16px; background: #fef2f2; border: 1px solid #fecaca; border-left: 4px solid #ef4444; border-radius: 10px; color: #991b1b; font-size: 12px; margin-bottom: 12px; white-space: pre-wrap; }
+  .progress-bar-wrap { background: #e2e8f0; border-radius: 99px; height: 5px; margin: 8px 0 4px; overflow: hidden; }
+  .progress-bar { height: 100%; background: linear-gradient(90deg, #1a3a5c, #1a6b8a); border-radius: 99px; transition: width .12s; }
+
+  /* ── Summary bar ── */
+  .summary-bar { border-radius: 14px; box-shadow: 0 2px 4px rgba(0,0,0,.05), 0 6px 20px rgba(15,42,71,.08); margin-bottom: 12px; overflow: hidden; border: 1.5px solid #e2e8f0; }
+  .summary-stat { color: #475569; }
+  .summary-stat b { color: #0f2a47; font-weight: 700; }
+  .summary-sep { color: #cbd5e1; }
+  .summary-ref { color: #4f46e5; font-weight: 600; font-size: 12px; }
+
+  /* ── Dashboard panel ──────────────────────────────────────────────────── */
+  .dash-panel { display: flex; flex-direction: column; }
+  /* Navy header — matches .header gradient */
+  .dash-hdr { background: linear-gradient(135deg, #0f2a47 0%, #1a3a5c 55%, #1b5272 100%);
+              padding: 14px 22px; display: flex; justify-content: space-between; align-items: center;
+              flex-wrap: wrap; gap: 10px; }
+  .dash-hdr-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .dash-hdr-eyebrow { font-size: 9px; letter-spacing: .14em; opacity: .5; text-transform: uppercase;
+                      color: white; font-weight: 600; }
+  .dash-hdr-title { font-size: 13px; font-weight: 700; color: white; opacity: .95;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dash-hdr-verdict { font-size: 10px; font-weight: 800; color: white; padding: 5px 14px;
+                      border-radius: 8px; letter-spacing: .07em; text-transform: uppercase;
+                      border: 1.5px solid rgba(255,255,255,.22); white-space: nowrap; flex-shrink: 0; }
+  /* Body below header */
+  .dash-body { display: flex; align-items: stretch; flex-wrap: wrap; background: white; }
+  /* Donut column */
+  .dash-donut-col { display: flex; flex-direction: column; align-items: center; justify-content: center;
+                    padding: 20px 18px; border-right: 1.5px solid #edf0f5; flex-shrink: 0; background: #fafbfd; }
+  .dash-donut-svg { width: 112px; height: 112px; }
+  .donut-track   { fill: none; stroke: #edf0f5; stroke-width: 13; }
+  .donut-seg     { fill: none; stroke-width: 13; }
+  .donut-covered { stroke: #22c55e; }
+  .donut-partial { stroke: #f59e0b; }
+  .donut-missing { stroke: #ef4444; }
+  .donut-label   { fill: #0f2a47; font-size: 20px; font-weight: 800; text-anchor: middle;
+                   font-family: system-ui, sans-serif; letter-spacing: -.02em; }
+  .donut-sub     { fill: #94a3b8; font-size: 8px; text-anchor: middle; font-family: system-ui, sans-serif;
+                   text-transform: uppercase; letter-spacing: .1em; }
+  /* KPI strip — sys-tile style */
+  .dash-kpis { display: flex; border-right: 1.5px solid #edf0f5; flex-shrink: 0; }
+  .kpi-card  { display: flex; flex-direction: column; align-items: center; justify-content: center;
+               padding: 16px 18px; text-align: center; min-width: 84px; gap: 0; }
+  .kpi-card + .kpi-card { border-left: 1.5px solid #edf0f5; }
+  .kpi-icon  { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center;
+               justify-content: center; margin-bottom: 8px; flex-shrink: 0; }
+  .kpi-num   { font-size: 26px; font-weight: 800; color: #0f2a47; line-height: 1;
+               font-variant-numeric: tabular-nums; }
+  .kpi-lbl   { font-size: 8.5px; text-transform: uppercase; letter-spacing: .09em; color: #94a3b8;
+               font-weight: 700; margin-top: 4px; }
+  .kpi-card.kpi-green  .kpi-num { color: #16a34a; }
+  .kpi-card.kpi-danger .kpi-num { color: #dc2626; }
+  /* Detail column */
+  .dash-detail { flex: 1; padding: 16px 20px; display: flex; flex-direction: column;
+                 gap: 9px; justify-content: center; min-width: 180px; }
+  .dash-detail-lbl { font-size: 8.5px; font-weight: 700; text-transform: uppercase;
+                     letter-spacing: .09em; color: #94a3b8; margin-bottom: 4px; }
+  /* Coverage stacked bar */
+  .dash-cov-bar  { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: #edf0f5; }
+  .dash-seg-cov  { background: #22c55e; transition: width .85s cubic-bezier(.4,0,.2,1); height: 100%; width: 0; }
+  .dash-seg-par  { background: #f59e0b; transition: width .85s cubic-bezier(.4,0,.2,1); height: 100%; width: 0; }
+  .dash-seg-mis  { background: #ef4444; transition: width .85s cubic-bezier(.4,0,.2,1); height: 100%; width: 0; }
+  /* Legend */
+  .dash-legend { display: flex; gap: 10px; font-size: 10px; color: #64748b; flex-wrap: wrap; }
+  .leg-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+  .leg-cov { background: #22c55e; } .leg-par { background: #f59e0b; } .leg-mis { background: #ef4444; }
+  /* Criticality rows */
+  .dash-crit-wrap { display: flex; flex-direction: column; gap: 4px; }
+  .crit-row      { display: flex; align-items: center; gap: 8px; }
+  .crit-row-lbl  { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+                   width: 46px; text-align: right; flex-shrink: 0; }
+  .crit-row-bar  { flex: 1; height: 6px; border-radius: 3px; overflow: hidden; background: #edf0f5; }
+  .crit-row-fill { height: 100%; border-radius: 3px; transition: width .85s cubic-bezier(.4,0,.2,1); width: 0%; }
+  .crit-row-pct  { font-size: 9.5px; color: #94a3b8; width: 28px; text-align: right; flex-shrink: 0; }
+  /* Freq chip */
+  .dash-freq-chip { font-size: 10px; color: #64748b; background: #f8fafc; border: 1.5px solid #edf0f5;
+                    border-radius: 6px; padding: 2px 10px; font-weight: 500; display: inline-block; }
+  /* Schedule mini bar */
+  .sched-minibar { display: flex; height: 5px; border-radius: 3px; overflow: hidden; width: 68px;
+                   background: #edf0f5; flex-shrink: 0; align-self: center; }
+  .smb-cov { background: #22c55e; } .smb-par { background: #f59e0b; } .smb-mis { background: #ef4444; }
+  /* Schedule section accent border */
+  .schedule-section { transition: border-left-color .3s; }
+  /* Mobile — dashboard */
+  @media (max-width: 640px) {
+    .dash-hdr { padding: 12px 16px; }
+    .dash-donut-col { display: none; }
+    .dash-kpis { flex: none; width: 100%; border-right: none; border-bottom: 1.5px solid #edf0f5; }
+    .kpi-card { flex: 1; padding: 10px 6px; }
+    .kpi-icon { width: 28px; height: 28px; border-radius: 7px; margin-bottom: 5px; }
+    .kpi-icon svg { width: 13px; height: 13px; }
+    .kpi-num  { font-size: 20px; }
+    .kpi-lbl  { font-size: 7.5px; letter-spacing: .06em; }
+    .dash-detail { padding: 12px 14px; }
+  }
+  .freq-detected { font-size: 11px; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 3px 10px; font-weight: 500; }
+  .summary-reason { font-size: 11px; color: #64748b; font-style: italic; }
+
+  /* ── Verdict badges ── */
+  .verdict-ACCEPTABLE        { font-weight: 700; font-size: 13px; color: white; background: #16a34a; padding: 5px 14px; border-radius: 6px; letter-spacing: .04em; }
+  .verdict-NEEDS_NEGOTIATION { font-weight: 700; font-size: 13px; color: white; background: #d97706; padding: 5px 14px; border-radius: 6px; letter-spacing: .04em; }
+  .verdict-REJECT            { font-weight: 700; font-size: 13px; color: white; background: #dc2626; padding: 5px 14px; border-radius: 6px; letter-spacing: .04em; }
+
+  /* ── Colorblind overrides ── */
+  body.cb .verdict-ACCEPTABLE        { background: #1565c0; }
+  body.cb .verdict-NEEDS_NEGOTIATION { background: #bf5000; }
+  body.cb .verdict-REJECT            { background: #880e4f; }
+  body.cb .badge-covered  { background: #e3f2fd; color: #1565c0; }
+  body.cb .badge-partial  { background: #fff3e0; color: #bf5000; }
+  body.cb .badge-missing  { background: #fce4ec; color: #880e4f; }
+  body.cb tr.row-covered  { background: #f0f7ff; }
+  body.cb tr.row-partial  { background: #fff8f0; }
+  body.cb tr.row-missing  { background: #fff0f5; }
+  body.cb .crit-high      { color: #880e4f; }
+  body.cb .freq-ok        { color: #1565c0; }
+  body.cb .freq-bad       { color: #880e4f; }
+  body.cb .critical-gaps  { border-color: #f48fb1; }
+  body.cb .critical-gaps h3 { color: #880e4f; }
+  body.cb .critical-gaps li { color: #880e4f; }
+
+  /* ── Critical gaps ── */
+  .critical-gaps { background: white; border: 1px solid #fecaca; border-left: 4px solid #ef4444; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; }
+  .critical-gaps h3 { color: #991b1b; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+  .critical-gaps ul { list-style: none; font-size: 11px; color: #7f1d1d; line-height: 2; }
+  .gap-link { cursor: pointer; }
+  .gap-link::before { content: "→ "; font-weight: 700; }
+  .gap-link:hover { color: #1a3a5c; text-decoration: underline; }
+
+  /* ── Filters ── */
+  .filter-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
+  .filter-input { flex: 1; min-width: 180px; padding: 8px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 12px; font-family: inherit; color: #334155; transition: border-color .15s; background: white; }
+  .filter-input:focus { outline: none; border-color: #1a6b8a; box-shadow: 0 0 0 3px rgba(26,107,138,.1); }
+  .filter-input::placeholder { color: #94a3b8; }
+  .filter-btn { padding: 8px 16px; border-radius: 8px; border: 1.5px solid #e2e8f0; background: white; font-size: 11px; cursor: pointer; color: #64748b; transition: all .15s; font-weight: 600; font-family: inherit; white-space: nowrap; min-height: 36px; touch-action: manipulation; }
+  .filter-btn.active { background: #1a3a5c; color: white; border-color: #1a3a5c; }
+  .filter-btn:hover:not(.active) { border-color: #1a6b8a; color: #1a6b8a; background: #f0f9ff; }
+
+  /* ── Schedule sections ── */
+  .schedule-section { background: white; border-radius: 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.03); overflow: hidden; border: 1px solid #f1f5f9; }
+  .schedule-header { padding: 12px 18px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-bottom: 1px solid #f1f5f9; user-select: none; transition: background .15s; gap: 10px; }
+  .schedule-header:hover { background: #f1f5f9; }
+  .schedule-header-left { font-size: 12px; font-weight: 700; color: #1a3a5c; min-width: 0; }
+  .schedule-header-right { display: flex; gap: 7px; align-items: center; font-size: 11px; color: #64748b; flex-wrap: wrap; flex-shrink: 0; }
+  .schedule-badge { padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: .03em; white-space: nowrap; }
+  .badge-covered { background: #dcfce7; color: #15803d; }
+  .badge-partial { background: #fef9c3; color: #a16207; }
+  .badge-missing { background: #fee2e2; color: #b91c1c; }
+  .chevron { transition: transform .2s; font-size: 11px; color: #94a3b8; flex-shrink: 0; }
+  .chevron.open { transform: rotate(180deg); }
+  .schedule-body { display: none; }
+  .schedule-body.open { display: block; }
+
+  /* ── Task table ── */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; min-width: 580px; }
+  th { background: #f8fafc; color: #64748b; text-align: left; padding: 8px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1.5px solid #e2e8f0; cursor: pointer; user-select: none; white-space: nowrap; font-weight: 600; }
+  th:hover { background: #f1f5f9; color: #1a3a5c; }
+  th .sort-arrow { opacity: .3; margin-left: 4px; }
+  th.sort-asc .sort-arrow::after  { content: '▲'; opacity: 1; }
+  th.sort-desc .sort-arrow::after { content: '▼'; opacity: 1; }
+  td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; color: #334155; }
+  tr:last-child td { border-bottom: none; }
+  tr.task-row:hover td { background: rgba(26,107,138,.025); }
+  tr.row-missing { background: #fff8f8; }
+  tr.row-partial { background: #fffdf4; }
+  tr.row-covered { background: white; }
+  tr.row-hidden  { display: none; }
+  .status-icon { font-size: 12px; margin-right: 4px; }
+  .crit-high   { color: #b91c1c; font-weight: 700; }
+  .crit-medium { color: #a16207; }
+  .crit-low    { color: #64748b; }
+  .conf-badge  { font-size: 10px; color: #64748b; background: #f1f5f9; border-radius: 5px; padding: 2px 7px; font-weight: 500; }
+  .freq-ok  { color: #16a34a; font-size: 10px; font-weight: 600; }
+  .freq-bad { color: #dc2626; font-size: 10px; font-weight: 700; }
+  .freq-unk { color: #94a3b8; font-size: 10px; }
+  .override-select { font-size: 11px; border: 1.5px solid #e2e8f0; border-radius: 6px; padding: 3px 6px; background: white; font-family: inherit; color: #334155; cursor: pointer; transition: border-color .15s; }
+  .override-select:focus { outline: none; border-color: #1a6b8a; }
+
+  /* ── Row scroll highlight ── */
+  @keyframes rowPulse { 0%,100% { outline: none; } 25% { outline: 3px solid #1a6b8a; outline-offset: -1px; } }
+  tr.row-pulse { animation: rowPulse 1.5s ease-out; }
+
+  /* ── Export buttons ── */
+  .export-row { display: grid; grid-template-columns: 1fr 1fr 1fr 2fr; gap: 8px; margin-bottom: 20px; margin-top: 6px; }
+  .btn-export { padding: 11px 8px; border-radius: 9px; background: white; border: 1.5px solid #e2e8f0; color: #475569; font-size: 12px; cursor: pointer; font-weight: 600; transition: all .15s; font-family: inherit; text-align: center; }
+  .btn-export:hover { border-color: #1a6b8a; color: #1a6b8a; background: #f0f9ff; }
+  .btn-export-primary { border-color: transparent !important; color: white !important; background: linear-gradient(135deg, #1a3a5c, #1a6b8a) !important; box-shadow: 0 3px 12px rgba(26,58,92,.22); }
+  .btn-export-primary:hover { opacity: .9; background: linear-gradient(135deg, #1a3a5c, #1a6b8a) !important; color: white !important; }
+
+  /* ── Mobile 640px ── */
+  @media (max-width: 640px) {
+    body { padding: 10px; }
+    .header { border-radius: 10px; padding: 14px 16px; }
+    .header-text h1 { font-size: 20px; }
+    .header-text p { display: none; }
+    .run-btn { padding: 16px; font-size: 15px; }
+    .filter-row { gap: 6px; }
+    .filter-btn { padding: 8px 10px; font-size: 10.5px; }
+    .filter-input { min-width: 0; }
+    .export-row { grid-template-columns: 1fr 1fr; }
+    .schedule-header { padding: 10px 12px; }
+    /* Keep minibar + chevron visible; hide text badges */
+    .schedule-badge { display: none; }
+    .schedule-header-left { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+    .sys-picker, .card { padding: 12px 12px; }
+    table { min-width: 380px; }
+    .override-select { min-height: 34px; padding: 4px 6px; }
+    /* LLM bar */
+    .llm-review-bar { padding: 10px 12px; }
+    .llm-bar-top { flex-direction: column; align-items: stretch; gap: 8px; }
+    .llm-review-btn { width: 100%; padding: 12px; font-size: 13px; text-align: center; }
+    .llm-model-tag, .llm-progress { font-size: 11px; }
+    .llm-task-log { max-height: 120px; font-size: 10.5px; }
+    .llm-pbar-label { font-size: 10.5px; }
+    .llm-panel { padding: 8px 10px 10px; }
+    .llm-accept-btn, .llm-dismiss-btn { display: block; width: 100%;
+                                        padding: 10px; margin: 4px 0 0; text-align: center; }
+    .llm-accept-btn { margin-right: 0; }
+    /* Hide less critical table columns */
+    th:nth-child(5), td:nth-child(5),   /* Skill */
+    th:nth-child(7), td:nth-child(7) {  /* Confidence */
+      display: none;
+    }
+  }
+  /* ── Mobile 400px ── */
+  @media (max-width: 400px) {
+    body { padding: 6px; }
+    .header-text h1 { font-size: 17px; }
+    .header-text .sub { display: none; }
+    .sys-grid { grid-template-columns: repeat(2,1fr); }
+    .export-row { grid-template-columns: 1fr 1fr; }
+    .quote-ref-row { flex-direction: column; align-items: stretch; gap: 4px; }
+    table { min-width: 300px; }
+    th:nth-child(8), td:nth-child(8) { display: none; } /* Freq Check */
+    .llm-task-log { max-height: 100px; }
+  }
+
+  /* ── LLM review ── */
+  .llm-review-bar { display:flex; flex-direction:column; gap:10px; background:white;
+                    border-radius:10px; padding:12px 18px; margin-bottom:10px;
+                    box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  .llm-bar-top { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .llm-pbar-track { height:8px; background:#ede9fe; border-radius:4px; overflow:hidden; margin-top:4px; }
+  .llm-pbar-fill  { height:100%; width:0%;
+                    background:linear-gradient(90deg,#4f46e5 0%,#7c3aed 50%,#4f46e5 100%);
+                    background-size:200% 100%;
+                    border-radius:4px;
+                    transition:width .6s cubic-bezier(.4,0,.2,1); }
+  .llm-pbar-fill.running { animation:llmShimmer 1.8s infinite linear; }
+  @keyframes llmShimmer {
+    0%   { background-position:200% 0; }
+    100% { background-position:-200% 0; }
+  }
+  .llm-pbar-meta { display:flex; justify-content:space-between; align-items:center; margin-top:5px; }
+  .llm-pbar-label { font-size:11px; color:#4f46e5; font-weight:600; }
+  .llm-elapsed    { font-size:11px; color:#94a3b8; font-variant-numeric:tabular-nums; }
+  /* E — task log */
+  .llm-task-log { max-height:152px; overflow-y:auto; margin-top:8px;
+                  background:#0f172a; border-radius:7px; padding:6px 0;
+                  font:11px/1.65 'SF Mono','Fira Code','Consolas',monospace;
+                  scrollbar-width:thin; scrollbar-color:#334155 #0f172a; }
+  .llm-task-log::-webkit-scrollbar { width:5px; }
+  .llm-task-log::-webkit-scrollbar-track { background:#0f172a; }
+  .llm-task-log::-webkit-scrollbar-thumb { background:#334155; border-radius:3px; }
+  .llm-log-entry { display:flex; gap:7px; padding:1px 12px;
+                   animation:llmLogIn .18s ease-out; }
+  @keyframes llmLogIn {
+    from { opacity:0; transform:translateX(-5px); }
+    to   { opacity:1; transform:translateX(0); }
+  }
+  .log-icon   { flex-shrink:0; width:13px; text-align:center; }
+  .log-name   { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .log-status { flex-shrink:0; padding-left:8px; }
+  .llm-log-cached   .log-icon   { color:#475569; }
+  .llm-log-cached   .log-name   { color:#64748b; }
+  .llm-log-cached   .log-status { color:#475569; }
+  .llm-log-checking .log-icon   { color:#818cf8; }
+  .llm-log-checking .log-name   { color:#c7d2fe; }
+  .llm-log-checking .log-status { color:#818cf8; }
+  .llm-log-upgraded .log-icon   { color:#4ade80; }
+  .llm-log-upgraded .log-name   { color:#bbf7d0; font-weight:600; }
+  .llm-log-upgraded .log-status { color:#4ade80; }
+  .llm-log-nochange .log-icon   { color:#334155; }
+  .llm-log-nochange .log-name   { color:#475569; }
+  .llm-log-nochange .log-status { color:#334155; }
+  .llm-log-error    .log-icon   { color:#f87171; }
+  .llm-log-error    .log-name   { color:#fca5a5; }
+  .llm-log-error    .log-status { color:#f87171; }
+  .llm-review-btn { padding:9px 20px; border-radius:8px; border:none; cursor:pointer;
+                    background:linear-gradient(135deg,#4f46e5,#7c3aed); color:white;
+                    font-size:12px; font-weight:700; font-family:inherit;
+                    transition:opacity .15s, transform .15s; }
+  .llm-review-btn:hover { opacity:.88; transform:translateY(-1px); }
+  .llm-review-btn:disabled { background:#94a3b8; cursor:not-allowed; transform:none; }
+  .llm-model-tag { font-size:11px; color:#64748b; background:#f1f5f9;
+                   border-radius:5px; padding:3px 8px; }
+  .llm-progress  { font-size:11px; color:#4f46e5; }
+  .llm-badge { display:inline-block; font-size:9.5px; font-weight:700; padding:2px 7px;
+               border-radius:10px; margin-left:6px; vertical-align:middle;
+               background:#ede9fe; color:#5b21b6; letter-spacing:.03em; }
+  .llm-row td { padding:0 !important; border-bottom:1px solid #ede9fe !important; }
+  .llm-panel { padding:8px 16px 12px; background:#faf5ff; }
+  .llm-reasoning { font-size:11px; color:#4c1d95; font-style:italic; margin-bottom:6px; }
+  .llm-accept-btn { font-size:11px; padding:6px 14px; border-radius:6px; border:none;
+                    background:#4f46e5; color:white; cursor:pointer; font-weight:600;
+                    font-family:inherit; transition:opacity .15s; margin-right:6px;
+                    min-height:36px; touch-action:manipulation; }
+  .llm-accept-btn:hover { opacity:.85; }
+  .llm-dismiss-btn { font-size:11px; padding:6px 12px; border-radius:6px;
+                     border:1.5px solid #e2e8f0; background:white; color:#64748b;
+                     cursor:pointer; font-family:inherit;
+                     min-height:36px; touch-action:manipulation; }
+  tr.row-hidden + tr.llm-row { display:none !important; }
+
+  /* B — scanning row pulse */
+  @keyframes llmScanPulse {
+    0%, 100% { background-color: transparent; }
+    50%       { background-color: rgba(139,92,246,.07); }
+  }
+  tr.llm-scanning { animation: llmScanPulse 1.3s ease-in-out infinite; }
+  tr.llm-scanning td:first-child { border-left: 3px solid #a78bfa !important; }
+
+  /* B — green flash when a result is upgraded */
+  @keyframes llmFlashUpgrade {
+    0%   { background-color: rgba(74,222,128,.38); }
+    100% { background-color: transparent; }
+  }
+  tr.llm-flash-upgrade { animation: llmFlashUpgrade 1.1s ease-out forwards; }
+
+  /* C — suggestion panel slide-in */
+  @keyframes llmSlideIn {
+    from { opacity:0; transform:translateY(-5px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  .llm-row { animation: llmSlideIn 0.28s ease-out; }
+
+  /* A — stats strip */
+  .llm-pbar-right { display:flex; align-items:center; gap:8px; }
+  .llm-upgrade-count { font-size:11px; font-weight:700; color:#16a34a;
+                       background:#dcfce7; border-radius:8px; padding:2px 9px;
+                       transition:all .3s; }
+  .llm-current-task { font-size:11px; color:#7c3aed; font-weight:600;
+                      min-height:16px; margin-top:3px;
+                      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* D — KPI pulse on accept */
+  @keyframes kpiPulse {
+    0%   { transform:scale(1); }
+    35%  { transform:scale(1.07); box-shadow:0 0 0 5px rgba(79,70,229,.18); }
+    100% { transform:scale(1); box-shadow:none; }
+  }
+  .kpi-card.kpi-pulse { animation:kpiPulse 0.45s ease-out; }
+
+  /* ══════════════════════════════════════════════════════════
+     DARK MODE  —  html.dark overrides
+     All colors chosen for WCAG AA contrast (≥4.5:1 on text)
+     ══════════════════════════════════════════════════════════ */
+
+  /* ── Global ── */
+  html.dark body           { background:#0d1117; color:#e2e8f0; }
+  html.dark .page-wrap     { color:#e2e8f0; }
+
+  /* ── Cards / panels ── */
+  html.dark .card          { background:#161b22; box-shadow:0 1px 3px rgba(0,0,0,.4); }
+  html.dark .card-title    { color:#93c5fd; }
+  html.dark .card p        { color:#94a3b8; }
+
+  /* ── System picker ── */
+  html.dark .sys-picker         { background:#161b22; box-shadow:0 1px 3px rgba(0,0,0,.4); }
+  html.dark .sys-picker-lead    { color:#94a3b8; }
+  html.dark .sys-tile           { background:#1e2a3a; border-color:#2d3748; }
+  html.dark .sys-tile:hover     { border-color:var(--c,#38bdf8); box-shadow:0 5px 14px rgba(0,0,0,.4); }
+  html.dark .sys-tile:focus     { border-color:var(--c,#38bdf8); }
+  html.dark .sys-name           { color:#cbd5e1; }
+  html.dark .ref-box            { background:#1e2a3a; border-color:#2d3748; color:#94a3b8; }
+  html.dark .ref-box .ref-title { color:#93c5fd; }
+
+  /* ── Inputs ── */
+  html.dark select              { background:#1e2a3a; border-color:#374151; color:#e2e8f0; }
+  html.dark select:focus        { border-color:#60a5fa; box-shadow:0 0 0 3px rgba(96,165,250,.15); }
+  html.dark textarea            { background:#1e2a3a; border-color:#374151; color:#e2e8f0; }
+  html.dark textarea:focus      { border-color:#60a5fa; box-shadow:0 0 0 3px rgba(96,165,250,.15); }
+  html.dark .quote-ref-input    { background:#1e2a3a; border-color:#374151; color:#e2e8f0; }
+  html.dark .quote-ref-input:focus { border-color:#818cf8; background:#1e2a3a; }
+  html.dark .quote-ref-label    { color:#94a3b8; }
+
+  /* ── Drop zone ── */
+  html.dark .drop-zone        { background:#1a2233; border-color:#3b5068; }
+  html.dark .drop-zone:hover,
+  html.dark .drop-zone.dz-hover { border-color:#38bdf8; background:#1a2f44; }
+  html.dark .drop-zone.dz-over  { border-color:#38bdf8; background:#1a2f44; }
+  html.dark .drop-zone.dz-ok    { border-color:#22c55e; background:#0d2818; }
+  html.dark .drop-zone.dz-error { border-color:#ef4444; background:#2a0d0d; }
+  html.dark .dz-label           { color:#38bdf8; }
+  html.dark .dz-sub             { color:#64748b; }
+
+  /* ── Loading / error ── */
+  html.dark .loading-banner { background:#1a2f44; border-color:#1e4e72; color:#7dd3fc; }
+  html.dark .spinner        { border-color:#1e4e72; border-top-color:#38bdf8; }
+  html.dark .error-box      { background:#2a0d0d; border-color:#7f1d1d; border-left-color:#ef4444; color:#fca5a5; }
+  html.dark .upload-status  { background:#0d2818; border-color:#166534; color:#86efac; }
+  html.dark .upload-status.error { background:#2a0d0d; border-color:#7f1d1d; color:#fca5a5; }
+  html.dark .upload-loading { background:#1a2f44; border-color:#1e4e72; color:#7dd3fc; }
+  html.dark .progress-bar-wrap { background:#1e2a3a; }
+
+  /* ── Evidence ── */
+  html.dark .evidence-row td    { border-bottom-color:#2d3748 !important; }
+  html.dark .evidence-panel     { background:#1a2233; }
+  html.dark .evidence-snippet   { background:#1e2a3a; border-left-color:#38bdf8; color:#cbd5e1; box-shadow:none; }
+  html.dark .evidence-snippet mark { background:#713f12; color:#fde68a; }
+
+  /* ── Modal ── */
+  html.dark .modal-box          { background:#161b22; box-shadow:0 20px 60px rgba(0,0,0,.7); }
+  html.dark .modal-title        { color:#e2e8f0; }
+  html.dark .modal-close        { background:#1e2a3a; color:#94a3b8; }
+  html.dark .modal-close:hover  { background:#2d3748; color:#e2e8f0; }
+  html.dark #contractTextFull   { background:#1e2a3a; border-color:#374151; color:#e2e8f0; }
+
+  /* ── Summary bar ── */
+  html.dark .summary-bar  { border-color:#2d3748; }
+  html.dark .summary-stat { color:#94a3b8; }
+  html.dark .summary-stat b { color:#e2e8f0; }
+  html.dark .summary-sep  { color:#374151; }
+  html.dark .summary-ref  { color:#a5b4fc; }
+
+  /* ── Dashboard ── */
+  html.dark .dash-body          { background:#161b22; }
+  html.dark .dash-donut-col     { background:#1a2233; border-right-color:#2d3748; }
+  html.dark .donut-track        { stroke:#2d3748; }
+  html.dark .donut-label        { fill:#e2e8f0; }
+  html.dark .donut-sub          { fill:#64748b; }
+  html.dark .dash-kpis          { border-right-color:#2d3748; }
+  html.dark .kpi-card           { background:#161b22; }
+  html.dark .kpi-card + .kpi-card { border-left-color:#2d3748; }
+  html.dark .kpi-num            { color:#e2e8f0; }
+  html.dark .kpi-card.kpi-green  .kpi-num { color:#4ade80; }
+  html.dark .kpi-card.kpi-danger .kpi-num { color:#f87171; }
+  html.dark .kpi-lbl            { color:#64748b; }
+  html.dark .dash-detail        { background:#161b22; }
+  html.dark .dash-detail-lbl    { color:#64748b; }
+  html.dark .dash-cov-bar       { background:#2d3748; }
+  html.dark .dash-legend        { color:#94a3b8; }
+  html.dark .crit-row-bar       { background:#2d3748; }
+  html.dark .crit-row-pct       { color:#64748b; }
+  html.dark .dash-freq-chip     { background:#1e2a3a; border-color:#2d3748; color:#94a3b8; }
+  html.dark .sched-minibar      { background:#2d3748; }
+  html.dark .kpi-card.kpi-pulse { animation:kpiPulse 0.45s ease-out; }
+
+  /* ── Critical gaps ── */
+  html.dark .critical-gaps      { background:#1e1212; border-color:#7f1d1d; }
+  html.dark .critical-gaps h3   { color:#fca5a5; }
+  html.dark .critical-gaps ul   { color:#fca5a5; }
+  html.dark .gap-link:hover     { color:#93c5fd; }
+
+  /* ── Filters ── */
+  html.dark .filter-input         { background:#1e2a3a; border-color:#374151; color:#e2e8f0; }
+  html.dark .filter-input:focus   { border-color:#60a5fa; box-shadow:0 0 0 3px rgba(96,165,250,.12); }
+  html.dark .filter-input::placeholder { color:#4b5563; }
+  html.dark .filter-btn           { background:#1e2a3a; border-color:#374151; color:#94a3b8; }
+  html.dark .filter-btn.active    { background:#1e3a5f; color:#93c5fd; border-color:#1e4e72; }
+  html.dark .filter-btn:hover:not(.active) { border-color:#38bdf8; color:#38bdf8; background:#1a2f44; }
+
+  /* ── Schedule sections ── */
+  html.dark .schedule-section         { background:#161b22; border-color:#2d3748; box-shadow:none; }
+  html.dark .schedule-header          { background:#1a2233; border-bottom-color:#2d3748; }
+  html.dark .schedule-header:hover    { background:#1e2a3a; }
+  html.dark .schedule-header-left     { color:#93c5fd; }
+  html.dark .schedule-header-right    { color:#64748b; }
+  html.dark .chevron                  { color:#4b5563; }
+
+  /* ── Badges ── */
+  html.dark .badge-covered { background:#052e16; color:#4ade80; }
+  html.dark .badge-partial { background:#2d1c00; color:#fbbf24; }
+  html.dark .badge-missing { background:#2d0a0a; color:#f87171; }
+
+  /* ── Table ── */
+  html.dark th                    { background:#1a2233; color:#64748b; border-bottom-color:#2d3748; }
+  html.dark th:hover              { background:#1e2a3a; color:#93c5fd; }
+  html.dark td                    { border-bottom-color:#1e2a3a; color:#cbd5e1; }
+  html.dark tr.task-row:hover td  { background:rgba(56,189,248,.04); }
+  html.dark tr.row-missing        { background:#1a0f0f; }
+  html.dark tr.row-partial        { background:#1a1500; }
+  html.dark tr.row-covered        { background:#161b22; }
+  html.dark .crit-high            { color:#f87171; }
+  html.dark .crit-medium          { color:#fbbf24; }
+  html.dark .crit-low             { color:#94a3b8; }
+  html.dark .conf-badge           { background:#1e2a3a; color:#94a3b8; }
+  html.dark .freq-ok              { color:#4ade80; }
+  html.dark .freq-bad             { color:#f87171; }
+  html.dark .freq-unk             { color:#4b5563; }
+  html.dark .override-select      { background:#1e2a3a; border-color:#374151; color:#e2e8f0; }
+  html.dark .override-select:focus { border-color:#60a5fa; }
+
+  /* ── Export buttons ── */
+  html.dark .btn-export           { background:#1e2a3a; border-color:#374151; color:#94a3b8; }
+  html.dark .btn-export:hover     { border-color:#38bdf8; color:#38bdf8; background:#1a2f44; }
+
+  /* ── LLM review bar ── */
+  html.dark .llm-review-bar       { background:#161b22; box-shadow:0 1px 3px rgba(0,0,0,.4); }
+  html.dark .llm-pbar-track       { background:#1e3a5f; }
+  html.dark .llm-upgrade-count    { background:#052e16; color:#4ade80; }
+  html.dark .llm-current-task     { color:#a5b4fc; }
+  html.dark .llm-model-tag        { background:#1e2a3a; color:#94a3b8; }
+  html.dark .llm-progress         { color:#a5b4fc; }
+  html.dark .llm-elapsed          { color:#4b5563; }
+  html.dark .llm-pbar-label       { color:#a5b4fc; }
+  /* task log is already dark — just tweak border */
+  html.dark .llm-badge            { background:#1e1b4b; color:#a5b4fc; }
+
+  /* LLM suggestion panel */
+  html.dark .llm-row td           { border-bottom-color:#2d3748 !important; }
+  html.dark .llm-panel            { background:#13111e; }
+  html.dark .llm-reasoning        { color:#c4b5fd; }
+  html.dark .llm-accept-btn       { background:#312e81; color:#c7d2fe; }
+  html.dark .llm-accept-btn:hover { background:#3730a3; }
+  html.dark .llm-dismiss-btn      { background:#1e2a3a; border-color:#374151; color:#64748b; }
+
+  /* ── Freq detected ── */
+  html.dark .freq-detected        { background:#1e2a3a; border-color:#374151; color:#94a3b8; }
+  html.dark .summary-reason       { color:#64748b; }
+
+  /* ── Colorblind combos in dark ── */
+  html.dark body.cb tr.row-covered { background:#161b22; }
+  html.dark body.cb tr.row-partial { background:#1a1500; }
+  html.dark body.cb tr.row-missing { background:#1a0f0f; }
+</style>
+</head>
+<body>
+
+<div class="page-wrap">
+
+<div class="header">
+  <div class="header-text">
+    <div class="sub">PPM Compliance · HTM 06 + SFG20</div>
+    <h1>PPM Compliance Checker</h1>
+    <p>HTM 06 + SFG20 · Rule-based · Offline · No API required</p>
+  </div>
+  <div class="header-actions">
+    <button class="cb-toggle" id="darkToggle" onclick="toggleDark()" title="Toggle dark mode">
+      🌙 Dark mode: OFF
+    </button>
+    <button class="cb-toggle" id="cbToggle" onclick="toggleColorblind()" title="Toggle colorblind-friendly palette">
+      👁 Colorblind mode: OFF
+    </button>
+  </div>
+</div>
+
+<div id="loadingBanner" class="loading-banner">
+  <div class="spinner"></div>
+  <span id="loadingMsg">Loading task database (canonical_tasks.json)…</span>
+</div>
+
+<div id="errorBox" class="error-box" style="display:none"></div>
+
+<div id="mainUI" style="display:none">
+  <!-- ── System picker ── -->
+  <div class="sys-picker">
+    <div class="card-title">System Under Review</div>
+    <p class="sys-picker-lead">Select the engineering system being assessed.</p>
+    <div class="sys-grid" id="sysGrid">
+
+      <div class="sys-tile" data-value="lv_distribution" style="--c:#d97706;--b:#fffbeb"
+           role="button" tabindex="0" aria-pressed="false" aria-label="LV Distribution &amp; Switchgear"
+           onclick="selectSystem('lv_distribution')" onkeydown="if(event.key==='Enter'||event.key===' '){selectSystem('lv_distribution');event.preventDefault()}">
+        <div class="sys-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M23 5L10 22h10L17 35l13-17H20z" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="sys-name">LV Distribution</div>
+      </div>
+
+      <div class="sys-tile" data-value="generators" style="--c:#2563eb;--b:#eff6ff"
+           role="button" tabindex="0" aria-pressed="false" aria-label="Generators / Standby Power"
+           onclick="selectSystem('generators')" onkeydown="if(event.key==='Enter'||event.key===' '){selectSystem('generators');event.preventDefault()}">
+        <div class="sys-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="20" cy="20" r="13" stroke="currentColor" stroke-width="2.5"/>
+            <circle cx="20" cy="20" r="5" stroke="currentColor" stroke-width="2.5"/>
+            <path d="M20 7v6M20 27v6M7 20h6M27 20h6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M16 20a4 4 0 0 1 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="sys-name">Generators</div>
+      </div>
+
+      <div class="sys-tile" data-value="ups" style="--c:#7c3aed;--b:#f5f3ff"
+           role="button" tabindex="0" aria-pressed="false" aria-label="UPS / Inverters / Batteries"
+           onclick="selectSystem('ups')" onkeydown="if(event.key==='Enter'||event.key===' '){selectSystem('ups');event.preventDefault()}">
+        <div class="sys-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="12" width="30" height="18" rx="3" stroke="currentColor" stroke-width="2.5"/>
+            <rect x="33" y="17" width="4" height="8" rx="2" fill="currentColor"/>
+            <path d="M21 16l-5 8h5l-3 7 9-11h-6z" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="sys-name">UPS / Batteries</div>
+      </div>
+
+      <div class="sys-tile" data-value="earthing" style="--c:#16a34a;--b:#f0fdf4"
+           role="button" tabindex="0" aria-pressed="false" aria-label="Earthing &amp; Bonding"
+           onclick="selectSystem('earthing')" onkeydown="if(event.key==='Enter'||event.key===' '){selectSystem('earthing');event.preventDefault()}">
+        <div class="sys-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 4v16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="7" y1="20" x2="33" y2="20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="11" y1="26" x2="29" y2="26" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="15" y1="32" x2="25" y2="32" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="sys-name">Earthing &amp; Bonding</div>
+      </div>
+
+      <div class="sys-tile" data-value="pat" style="--c:#ea580c;--b:#fff7ed"
+           role="button" tabindex="0" aria-pressed="false" aria-label="PAT Testing"
+           onclick="selectSystem('pat')" onkeydown="if(event.key==='Enter'||event.key===' '){selectSystem('pat');event.preventDefault()}">
+        <div class="sys-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="8" y="9" width="24" height="22" rx="6" stroke="currentColor" stroke-width="2.5"/>
+            <rect x="18" y="3" width="4" height="7" rx="2" fill="currentColor"/>
+            <circle cx="14" cy="19" r="2.5" fill="currentColor"/>
+            <circle cx="26" cy="19" r="2.5" fill="currentColor"/>
+            <rect x="17" y="24" width="6" height="5" rx="1.5" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="sys-name">PAT Testing</div>
+      </div>
+
+      <div class="sys-tile" data-value="hvs" style="--c:#dc2626;--b:#fef2f2"
+           role="button" tabindex="0" aria-pressed="false" aria-label="HV Systems"
+           onclick="selectSystem('hvs')" onkeydown="if(event.key==='Enter'||event.key===' '){selectSystem('hvs');event.preventDefault()}">
+        <div class="sys-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 5L3 35h34L20 5z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+            <path d="M22 15l-5 9h4l-3 8 9-13h-5z" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="sys-name">HV Systems</div>
+      </div>
+
+      <div class="sys-tile" data-value="smoke_control" style="--c:#475569;--b:#f1f5f9"
+           role="button" tabindex="0" aria-pressed="false" aria-label="Smoke Control / AOV"
+           onclick="selectSystem('smoke_control')" onkeydown="if(event.key==='Enter'||event.key===' '){selectSystem('smoke_control');event.preventDefault()}">
+        <div class="sys-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="20" cy="20" r="3.5" fill="currentColor"/>
+            <path d="M20 16.5C19 10 13 8.5 12 12.5c-.8 3 2.5 6.5 8 8" fill="currentColor"/>
+            <path d="M23.5 20C30 21 31.5 27 27.5 28c-3 .8-6.5-2.5-7.5-8" fill="currentColor"/>
+            <path d="M20 23.5C21 30 27 31.5 28 27.5c.8-3-2.5-6.5-8-7.5" fill="currentColor"/>
+            <path d="M16.5 20C10 19 8.5 13 12.5 12c3-.8 6.5 2.5 7.5 8" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="sys-name">Smoke Control</div>
+      </div>
+
+      <div class="sys-tile" data-value="pumps" style="--c:#0891b2;--b:#ecfeff"
+           role="button" tabindex="0" aria-pressed="false" aria-label="Pumps &amp; Pressurisation"
+           onclick="selectSystem('pumps')" onkeydown="if(event.key==='Enter'||event.key===' '){selectSystem('pumps');event.preventDefault()}">
+        <div class="sys-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="20" cy="20" r="13" stroke="currentColor" stroke-width="2.5"/>
+            <circle cx="20" cy="20" r="4" stroke="currentColor" stroke-width="2"/>
+            <path d="M20 2v5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+            <path d="M35 20h3" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+            <path d="M20 16C23 12.5 27.5 14 26 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M24 20C27.5 23 26 27.5 20 26" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M20 24C17 27.5 12.5 26 14 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M16 20C12.5 17 14 12.5 20 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="sys-name">Pumps &amp; Press.</div>
+      </div>
+
+      <div class="sys-tile" data-value="hvac_dehumid" style="--c:#0284c7;--b:#f0f9ff"
+           role="button" tabindex="0" aria-pressed="false" aria-label="HVAC / Dehumidification"
+           onclick="selectSystem('hvac_dehumid')" onkeydown="if(event.key==='Enter'||event.key===' '){selectSystem('hvac_dehumid');event.preventDefault()}">
+        <div class="sys-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 4v32M4 20h32" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M8.7 8.7l22.6 22.6M31.3 8.7L8.7 31.3" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M16 8l4-4 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M24 32l-4 4-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8 16l-4 4 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M32 24l4-4-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="sys-name">HVAC / Dehumid</div>
+      </div>
+
+      <div class="sys-tile" data-value="lighting_control" style="--c:#ca8a04;--b:#fefce8"
+           role="button" tabindex="0" aria-pressed="false" aria-label="Lighting &amp; Controls"
+           onclick="selectSystem('lighting_control')" onkeydown="if(event.key==='Enter'||event.key===' '){selectSystem('lighting_control');event.preventDefault()}">
+        <div class="sys-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M27 15a9 9 0 1 0-14 7.4l.5 5.6h12l.5-5.6A9 9 0 0 0 27 15z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+            <line x1="14" y1="32" x2="26" y2="32" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="16" y1="36" x2="24" y2="36" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="sys-name">Lighting &amp; Controls</div>
+      </div>
+
+    </div>
+    <div class="ref-box" id="refBox">
+      <div class="ref-title">Applicable Standards</div>
+      <div id="refList">Select a system to see applicable schedules.</div>
+    </div>
+  </div>
+
+  <!-- ── Contract text (full width) ── -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">Subcontractor Contract Text</div>
+    <p>Paste contract text below, or drag &amp; drop / upload a file.</p>
+    <div class="drop-zone" id="dropZone" role="button" aria-label="Upload contract file — click or drag and drop">
+      <input type="file" id="fileInput" accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,text/plain" aria-label="Upload contract text file" tabindex="-1">
+      <div class="dz-icon" id="dzIcon">📄</div>
+      <div class="dz-label" id="dzLabel">Drop file here or click to browse</div>
+      <div class="dz-sub">.pdf · .docx · .txt</div>
+      <div class="dz-filename" id="dzFilename"></div>
+    </div>
+    <div id="uploadLoading" class="upload-loading">⏳ Extracting text…</div>
+    <div id="uploadStatus" class="upload-status"></div>
+    <div class="textarea-wrap">
+      <textarea id="contractText" placeholder="Paste contract scope of works text here…" aria-label="Contract scope of works text"></textarea>
+      <button class="expand-btn" onclick="openEditor()" title="Open full-screen editor">⛶ Expand</button>
+    </div>
+    <div class="quote-ref-row">
+      <label class="quote-ref-label" for="quoteRefInput">Contract / Quote ref:</label>
+      <input type="text" id="quoteRefInput" class="quote-ref-input" placeholder="Auto-detected from text — edit freely" aria-label="Contract or quote reference">
+    </div>
+  </div>
+
+  <!-- Hidden select kept for JS compatibility -->
+  <select id="systemSelect" style="display:none" aria-label="Select engineering system">
+    <option value="">— Select system —</option>
+    <option value="lv_distribution">LV Distribution &amp; Switchgear</option>
+    <option value="generators">Generators / Standby Power</option>
+    <option value="ups">UPS / Inverters / Batteries</option>
+    <option value="earthing">Earthing &amp; Bonding</option>
+    <option value="pat">PAT Testing</option>
+    <option value="hvs">HV Systems</option>
+    <option value="smoke_control">Smoke Control / AOV</option>
+    <option value="pumps">Pumps &amp; Pressurisation</option>
+    <option value="hvac_dehumid">HVAC / Dehumidification</option>
+    <option value="lighting_control">Lighting &amp; Controls</option>
+  </select>
+
+  <button id="runBtn" class="run-btn" disabled>Run Compliance Check</button>
+
+  <div id="progressWrap" style="display:none">
+    <div class="loading-banner">
+      <div class="spinner"></div>
+      <span id="progressMsg">Analysing tasks…</span>
+    </div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+  </div>
+
+  <!-- Results area -->
+  <div id="results" style="display:none">
+    <div id="summaryBar" class="summary-bar"></div>
+    <div id="criticalGaps" class="critical-gaps" style="display:none">
+      <h3>⚠️ CRITICAL GAPS — HIGH criticality tasks not evidenced:</h3>
+      <ul id="criticalGapsList"></ul>
+    </div>
+
+    <div class="filter-row">
+      <input type="text" id="filterInput" class="filter-input" placeholder="Filter by task title…" aria-label="Filter tasks by title">
+      <button class="filter-btn active" data-filter="all"     onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn"        data-filter="high"    onclick="setFilter('high',this)">HIGH only</button>
+      <button class="filter-btn"        data-filter="missing" onclick="setFilter('missing',this)">Missing only</button>
+    </div>
+
+    <!-- LLM semantic review bar (hidden until Ollama detected) -->
+    <div id="llmReviewBar" class="llm-review-bar" style="display:none">
+      <div class="llm-bar-top">
+        <button id="llmRunBtn" class="llm-review-btn" onclick="runSemanticReview()">✦ Run semantic review</button>
+        <span class="llm-model-tag"></span>
+        <span class="llm-progress" id="llmProgress">Reviews MISSING &amp; PARTIAL tasks using local LLM</span>
+      </div>
+      <div id="llmProgressDetail" style="display:none">
+        <div class="llm-pbar-track"><div id="llmPbarFill" class="llm-pbar-fill"></div></div>
+        <div class="llm-pbar-meta">
+          <span id="llmPbarLabel" class="llm-pbar-label"></span>
+          <span class="llm-pbar-right">
+            <span id="llmUpgradeCount" class="llm-upgrade-count" style="display:none"></span>
+            <span id="llmElapsed" class="llm-elapsed"></span>
+          </span>
+        </div>
+        <div id="llmCurrentTask" class="llm-current-task"></div>
+        <div id="llmTaskLog" class="llm-task-log"></div>
+      </div>
+    </div>
+
+    <div id="scheduleContainer"></div>
+
+    <div class="export-row">
+      <button class="btn-export" onclick="exportTxt()">↓ .txt</button>
+      <button class="btn-export" onclick="exportCsv()">↓ .csv</button>
+      <button class="btn-export" onclick="exportJson()">↓ .json</button>
+      <button class="btn-export btn-export-primary" onclick="exportHtml()">↓ Export Full Report (HTML/PDF)</button>
+    </div>
+  </div>
+</div>
+
+<!-- Full-screen editor modal -->
+<div id="editorModal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-label="Full-screen contract editor">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Contract Text — Full Editor</span>
+      <button class="modal-close" onclick="closeEditor()">✕ Done</button>
+    </div>
+    <textarea id="contractTextFull" placeholder="Paste contract scope of works text here…" aria-label="Full-screen contract text editor"></textarea>
+  </div>
+</div>
+
+</div><!-- /.page-wrap -->
+
+<script>
+'use strict';
+
+// ─── System → Schedule mapping ───────────────────────────────────────────────
+const SYSTEM_REFS = {
+  lv_distribution: {
+    label: 'LV Distribution & Switchgear',
+    // 44-01 removed — 0 tasks (Introductory Procedures only)
+    // HTM 06-27 removed — organisational compliance audits (AE/AP), not LV equipment maintenance
+    // HTM 06-17 added — cable containment (conduits/trunking) is part of LV system inspection
+    sfg20: ['44-02','44-07','44-10','44-11','44-13'],
+    htm06: ['HTM 06-09','HTM 06-11','HTM 06-17','HTM 06-23']
+  },
+  generators: {
+    label: 'Generators / Standby Power',
+    // 43-01 removed — 0 tasks (Introductory Procedures only)
+    // HTM 06-26 removed — organisational AP housekeeping obligation, not generator equipment task
+    sfg20: ['43-02','43-09'],
+    htm06: ['HTM 06-12']
+  },
+  ups: {
+    label: 'UPS / Inverters / Batteries',
+    // HTM 06-26 removed — organisational AP housekeeping obligation
+    sfg20: ['43-05','43-03','43-04'],
+    htm06: ['HTM 06-19']
+  },
+  earthing: {
+    label: 'Earthing & Bonding',
+    sfg20: ['44-06','38-01','38-02'],
+    htm06: ['HTM 06-14','HTM 06-15','HTM 06-16']
+  },
+  pat: {
+    label: 'PAT Testing',
+    sfg20: [],
+    htm06: ['HTM 06-24']
+  },
+  hvs: {
+    label: 'HV Systems',
+    // 70-01 removed — 0 tasks (Introductory Procedures only)
+    // HTM 06-28 removed — organisational HV compliance audits (AE/AP training), not HV equipment tasks
+    sfg20: ['70-02','70-03','70-05','70-06','70-07','70-08','70-09'],
+    htm06: ['HTM 06-01','HTM 06-02','HTM 06-25']
+  },
+  smoke_control: {
+    label: 'Smoke Control / AOV',
+    // 52-01 removed — 0 tasks (Introductory Procedures only)
+    // HTM 06-26 removed — organisational AP housekeeping, not smoke vent contractor obligation
+    // HTM 06-27 removed — LV compliance audits, not smoke vent contractor obligation
+    // 52-04 added — Smoke Barrier Active (13 tasks)
+    // 52-05 added — Smoke Barrier Static (3 tasks)
+    // 52-10 added — Car Park Smoke Control System (13 tasks, directly relevant to jet fan contracts)
+    sfg20: ['52-02','52-03','52-04','52-05','52-06','52-07','52-08','52-10'],
+    htm06: []
+  },
+  pumps: {
+    label: 'Pumps & Pressurisation',
+    // HTM 06-26 removed in prior revision — organisational AP housekeeping
+    sfg20: ['45-01','45-02','45-03','45-04','45-12','40-25'],
+    htm06: ['HTM 06-10']
+  },
+  hvac_dehumid: {
+    label: 'HVAC / Dehumidification',
+    // HTM 06-17 removed — cable containment (conduits/trunking), not HVAC equipment
+    // HTM 06-26 removed — organisational AP housekeeping obligation
+    sfg20: ['03-01'],
+    htm06: []
+  },
+  lighting_control: {
+    label: 'Lighting & Controls',
+    // HTM 06-26 removed — organisational AP housekeeping obligation
+    // HTM 06-29 removed — Bedhead Services (medical gas/nurse call) is a separate discipline,
+    //   not within scope of a lighting control SLA
+    sfg20: ['37-01','37-02','37-03','37-04','37-05','14-25'],
+    htm06: ['HTM 06-23']
+  }
+};
+
+// ─── Synonym expansion ────────────────────────────────────────────────────────
+const SYNONYMS = {
+  'ups':            ['uninterruptible power supply','uninterruptible'],
+  'rcd':            ['residual current device','residual current'],
+  'afdd':           ['arc fault detection','arc fault'],
+  'genset':         ['generator','standby generator'],
+  'lv':             ['low voltage'],
+  'hv':             ['high voltage'],
+  'pat':            ['portable appliance'],
+  'mccb':           ['moulded case circuit breaker'],
+  'acb':            ['air circuit breaker'],
+  'vessel':         ['expansion vessel'],
+  'circulator':     ['circulating pump'],
+  'booster':        ['pressure booster', 'booster set'],
+  'pressurisation': ['pressurising unit', 'pressurizing unit', 'booster set'],
+  'operation':      ['operational test', 'function test', 'run test'],
+  'settings':       ['set point', 'setpoint'],
+  'service':        ['servicing', 'overhaul'],
+  'servicing':      ['service', 'overhaul'],
+  'maintenance':    ['servicing', 'service'],
+  // Emergency lighting: IS3217 (Irish standard) implies testing of both self-contained
+  // and centrally powered fittings — expand so contracts citing the standard match tasks
+  'is3217':         ['self contained', 'centrally powered', 'emergency lighting'],
+  'filter':         ['filters', 'filtration', 'filter change', 'filter replacement'],
+  'filters':        ['filter', 'filtration', 'filter change'],
+};
+const SYNONYM_REVERSE = {};
+for (const [abbr, expansions] of Object.entries(SYNONYMS)) {
+  for (const exp of expansions) SYNONYM_REVERSE[exp] = abbr;
+}
+
+// ─── Tokenisation ─────────────────────────────────────────────────────────────
+const STOP_WORDS = new Set([
+  'test','check','inspect','ensure','verify',
+  'the','and','for','with','all','any','that','this','each','shall','must',
+  'perform','carry','where','should','using','upon','from','into',
+  'will','have','been','also','when','then','them','they','their',
+]);
+
+function tokenise(text) {
+  if (!text) return [];
+  const base = text.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !STOP_WORDS.has(w));
+  const expanded = [];
+  for (const tok of base) {
+    expanded.push(tok);
+    if (SYNONYMS[tok]) {
+      for (const syn of SYNONYMS[tok]) expanded.push(...syn.split(' '));
+    }
+  }
+  return expanded;
+}
+
+function ngrams(tokens, n) {
+  const out = [];
+  for (let i = 0; i <= tokens.length - n; i++)
+    out.push(tokens.slice(i, i + n).join(' '));
+  return out;
+}
+
+function expandText(text) {
+  if (!text) return text;
+  let t = text.toLowerCase();
+  for (const [phrase, abbr] of Object.entries(SYNONYM_REVERSE)) {
+    if (t.includes(phrase)) t += ' ' + abbr;
+  }
+  return t;
+}
+
+// ─── Fuzzy matching (Levenshtein, tokens ≥ 8 chars, max edit distance 1) ──────
+let contractFuzzyTokens = [];
+let contractSentences        = [];   // string[]
+let contractSentenceTokenSets = [];  // Set<string>[]
+
+function levenshtein(a, b) {
+  const al = a.length, bl = b.length;
+  if (al === 0) return bl;
+  if (bl === 0) return al;
+  if (Math.abs(al - bl) > 1) return 99; // fast reject — we only allow dist ≤ 1
+  const row = Array.from({length: bl + 1}, (_, i) => i);
+  for (let i = 1; i <= al; i++) {
+    let prev = i - 1;
+    row[0] = i;
+    for (let j = 1; j <= bl; j++) {
+      const temp = row[j];
+      row[j] = a[i-1] === b[j-1] ? prev : 1 + Math.min(prev, row[j], row[j-1]);
+      prev = temp;
+    }
+  }
+  return row[bl];
+}
+
+function fuzzyInContract(token) {
+  if (token.length < 8) return false;
+  for (const ct of contractFuzzyTokens) {
+    if (levenshtein(token, ct) <= 1) return true;
+  }
+  return false;
+}
+
+function buildIndex(text) {
+  const expanded = expandText(text);
+  const tokens   = tokenise(expanded);
+  contractFuzzyTokens = [...new Set(tokens.filter(t => t.length >= 8))];
+
+  // sentence-level index for evidence gathering
+  contractSentences = splitSentences(text);
+  contractSentenceTokenSets = contractSentences.map(s => {
+    const st = tokenise(expandText(s));
+    return new Set([...st, ...ngrams(st, 2), ...ngrams(st, 3)]);
+  });
+
+  return new Set([...tokens, ...ngrams(tokens, 2), ...ngrams(tokens, 3)]);
+}
+
+function splitSentences(text) {
+  return text
+    .split(/\n+|(?<=[.!?;])\s+(?=[A-Z])/)
+    .map(s => s.trim())
+    .filter(s => s.length > 15 && s.length < 600);
+}
+
+function gatherEvidence(task, status) {
+  if (status === 'MISSING' || contractSentences.length === 0) return [];
+
+  const titleToks = tokenise(task.title);
+  const notesToks = tokenise(task.notes || '');
+  const taskTerms = new Set([
+    ...titleToks, ...ngrams(titleToks, 2), ...ngrams(titleToks, 3),
+    ...notesToks, ...ngrams(notesToks, 2),
+  ]);
+  if (taskTerms.size === 0) return [];
+
+  const scored = contractSentences.map((s, i) => {
+    const sSet = contractSentenceTokenSets[i];
+    const matched = new Set();
+    for (const term of taskTerms) {
+      if (sSet.has(term)) {
+        if (!term.includes(' ')) matched.add(term);  // unigrams only for highlight
+      }
+    }
+    return { text: s, hits: matched.size, matchedTokens: [...matched] };
+  });
+
+  return scored
+    .filter(s => s.hits > 0)
+    .sort((a, b) => b.hits - a.hits)
+    .slice(0, 3);
+}
+
+function highlightEvidence(sentenceText, matchedTokens) {
+  let html = escHtml(sentenceText);
+  for (const tok of matchedTokens) {
+    const re = new RegExp('(?<![a-zA-Z0-9])(' +
+      tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+    ')(?![a-zA-Z0-9])', 'gi');
+    html = html.replace(re, '<mark>$1</mark>');
+  }
+  return html;
+}
+
+function toggleEvidence(btn) {
+  const evRow = btn.closest('tr').nextElementSibling;
+  if (!evRow || !evRow.classList.contains('evidence-row')) return;
+  const open = evRow.style.display === '';
+  evRow.style.display = open ? 'none' : '';
+  btn.setAttribute('aria-expanded', !open);
+  btn.textContent = open ? '▶ evidence' : '▼ evidence';
+}
+
+// ─── LLM semantic review ──────────────────────────────────────────────────────
+let llmStatus = { available: false, model: null, embed_model: null };
+
+async function checkLlmAvailability() {
+  try {
+    const r = await fetch('/llm_status');
+    llmStatus = await r.json();
+  } catch { llmStatus = { available: false }; }
+
+  const bar = document.getElementById('llmReviewBar');
+  if (!bar) return;
+  if (llmStatus.available) {
+    bar.style.display = '';
+    const tag = bar.querySelector('.llm-model-tag');
+    if (tag) tag.textContent = llmStatus.model || 'Ollama';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+async function runSemanticReview() {
+  const btn            = document.getElementById('llmRunBtn');
+  const progressEl     = document.getElementById('llmProgress');
+  const detailEl       = document.getElementById('llmProgressDetail');
+  const pbarFill       = document.getElementById('llmPbarFill');
+  const pbarLabel      = document.getElementById('llmPbarLabel');
+  const elapsedEl      = document.getElementById('llmElapsed');
+  const taskLog        = document.getElementById('llmTaskLog');
+  const currentTaskEl  = document.getElementById('llmCurrentTask');
+  const upgradeCountEl = document.getElementById('llmUpgradeCount');
+  const contractText   = document.getElementById('contractText').value;
+  const cHash          = contractHash(contractText);
+
+  const candidates = allResults.filter(r =>
+    (r.status === 'MISSING' || r.status === 'PARTIAL') && !r.override
+  );
+  if (candidates.length === 0) { progressEl.textContent = 'No MISSING/PARTIAL tasks to review.'; return; }
+
+  btn.disabled = true;
+
+  // Show progress UI and reset
+  detailEl.style.display = '';
+  taskLog.innerHTML      = '';
+  currentTaskEl.textContent = '';
+  upgradeCountEl.style.display = 'none';
+  upgradeCountEl.textContent   = '';
+
+  // ── E: per-task log helpers ────────────────────────────────────────────────
+  const taskLogMap = {};
+  function addLogEntry(taskId, cls, icon, name, status) {
+    const el = document.createElement('div');
+    el.className = `llm-log-entry ${cls}`;
+    el.id = 'llm-log-' + taskId.replace(/[^a-zA-Z0-9]/g, '-');
+    // 'spin' sentinel → braille spinner span; otherwise literal icon character
+    const iconHtml = icon === 'spin'
+      ? '<span class="log-spin">⠋</span>'
+      : escHtml(icon);
+    el.innerHTML = `<span class="log-icon">${iconHtml}</span>`
+                 + `<span class="log-name">${escHtml(name)}</span>`
+                 + `<span class="log-status">${escHtml(status)}</span>`;
+    taskLog.appendChild(el);
+    taskLog.scrollTop = taskLog.scrollHeight;
+    taskLogMap[taskId] = el;
+  }
+  function updateLogEntry(taskId, cls, icon, statusText) {
+    const el = taskLogMap[taskId];
+    if (!el) return;
+    el.className = `llm-log-entry ${cls}`;
+    el.querySelector('.log-icon').textContent    = icon;
+    el.querySelector('.log-status').textContent  = statusText;
+    el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+    taskLog.scrollTop = taskLog.scrollHeight;
+  }
+
+  // ── Load from cache — log cached tasks immediately ─────────────────────────
+  const uncached = [];
+  for (const result of candidates) {
+    const cached = llmCache.get(result.task_id, cHash);
+    if (cached) {
+      applyLlmSuggestion(result.task_id, cached.status, cached.reasoning, cached.key_sentences);
+      addLogEntry(result.task_id, 'llm-log-cached', '○', result.title,
+                  `${cached.status}  (cached)`);
+    } else {
+      uncached.push(result);
+    }
+  }
+
+  if (uncached.length === 0) {
+    pbarFill.style.width  = '100%';
+    pbarLabel.textContent = '✓ All cached';
+    progressEl.textContent = `All ${candidates.length} tasks loaded from cache instantly.`;
+    btn.disabled = false;
+    return;
+  }
+
+  const CHUNK        = 6;
+  const totalChunks  = Math.ceil(uncached.length / CHUNK);
+  progressEl.textContent = `Reviewing ${uncached.length} tasks in ${totalChunks} batch${totalChunks > 1 ? 'es' : ''}…`;
+
+  // Braille spinner — all checking entries share one timer, animate in sync
+  const SPIN_FRAMES = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+  let _spinFrame = 0;
+  const spinTimer = setInterval(() => {
+    const f = SPIN_FRAMES[_spinFrame++ % SPIN_FRAMES.length];
+    taskLog.querySelectorAll('.log-spin').forEach(el => el.textContent = f);
+  }, 80);
+
+  // Global elapsed timer
+  const startTime = Date.now();
+  function fmt(ms) {
+    const s = Math.floor(ms / 1000);
+    return s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`;
+  }
+  const elapsedTimer = setInterval(() => {
+    elapsedEl.textContent = fmt(Date.now() - startTime) + ' elapsed';
+  }, 500);
+
+  // Simulated intra-batch progress (asymptotic crawl)
+  let _rafId = null;
+  function startFakeProgress(fromPct, toPct, batchLabel) {
+    const segSize    = toPct - fromPct;
+    const batchStart = Date.now();
+    const TAU        = 55000;
+    pbarFill.classList.add('running');
+    function tick() {
+      const elapsed = Date.now() - batchStart;
+      const simPct  = fromPct + segSize * 0.95 * (1 - Math.exp(-elapsed / TAU));
+      pbarFill.style.width    = simPct.toFixed(1) + '%';
+      pbarLabel.textContent   = batchLabel;
+      _rafId = requestAnimationFrame(tick);
+    }
+    _rafId = requestAnimationFrame(tick);
+  }
+  function stopFakeProgress(snapToPct) {
+    if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
+    pbarFill.classList.remove('running');
+    pbarFill.style.width = snapToPct + '%';
+  }
+
+  const statusRank = { 'MISSING': 0, 'PARTIAL': 1, 'COVERED': 2 };
+  let upgraded = 0;
+  let reviewed = 0;
+
+  for (let i = 0; i < uncached.length; i += CHUNK) {
+    const chunkIdx = Math.floor(i / CHUNK);
+    const chunk    = uncached.slice(i, i + CHUNK);
+    const fromPct  = Math.round((i / uncached.length) * 100);
+    const toPct    = Math.round(((i + chunk.length) / uncached.length) * 100);
+
+    startFakeProgress(fromPct, toPct,
+      `Batch ${chunkIdx + 1} of ${totalChunks} — ${llmStatus.model} thinking…`);
+
+    // E — add checking entries to log (spinner icon)
+    chunk.forEach(r => addLogEntry(r.task_id, 'llm-log-checking', 'spin', r.title, 'checking…'));
+
+    // B — highlight rows being scanned
+    const scanRows = chunk.map(r => {
+      const tr = document.getElementById('row-' + r.task_id.replace(/[^a-zA-Z0-9]/g, '-'));
+      if (tr) { tr.classList.add('llm-scanning'); tr.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
+      return tr;
+    }).filter(Boolean);
+
+    // A — current task label
+    currentTaskEl.textContent = `⟳  ${chunk.map(r => r.title).join('  ·  ')}`;
+
+    let ok = false;
+    let chunkUpgrades = 0;
+    try {
+      const resp = await fetch('/llm_check_batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tasks: chunk.map(r => ({
+            task_id:    r.task_id,
+            task_title: r.title,
+            task_notes: r.notes || '',
+          })),
+          contract_text: contractText,
+          model:         llmStatus.model,
+        }),
+      });
+      if (resp.ok) {
+        ok = true;
+        const data = await resp.json();
+        // Build result map for O(1) lookup
+        const resultMap = {};
+        for (const item of (data.results || [])) resultMap[item.task_id] = item;
+        // Iterate chunk to preserve order and catch any tasks missing from results
+        for (const r of chunk) {
+          const item = resultMap[r.task_id];
+          if (item && statusRank[item.status] > statusRank[r.status]) {
+            llmCache.set(r.task_id, cHash, item);
+            applyLlmSuggestion(r.task_id, item.status, item.reasoning, item.key_sentences);
+            upgraded++;
+            chunkUpgrades++;
+            upgradeCountEl.style.display = '';
+            upgradeCountEl.textContent   = `✦ ${upgraded} upgrade${upgraded !== 1 ? 's' : ''} found`;
+            // E — update log entry to show upgrade
+            updateLogEntry(r.task_id, 'llm-log-upgraded', '✦', `→ ${item.status} ✓`);
+          } else {
+            // E — no upgrade
+            updateLogEntry(r.task_id, 'llm-log-nochange', '·', 'no change');
+          }
+        }
+      }
+    } catch (_) {
+      // E — mark all tasks in this batch as errored
+      chunk.forEach(r => updateLogEntry(r.task_id, 'llm-log-error', '✗', 'error'));
+    }
+
+    // B — remove scanning highlight
+    scanRows.forEach(tr => tr.classList.remove('llm-scanning'));
+    stopFakeProgress(toPct);
+    reviewed += chunk.length;
+  }
+
+  clearInterval(elapsedTimer);
+  clearInterval(spinTimer);
+  stopFakeProgress(100);
+  pbarLabel.textContent     = '✓ Complete';
+  elapsedEl.textContent     = fmt(Date.now() - startTime) + ' total';
+  currentTaskEl.textContent = '';
+  progressEl.textContent    = `Done — ${upgraded} upgrade${upgraded !== 1 ? 's' : ''} suggested from ${reviewed} tasks reviewed.`;
+  btn.disabled = false;
+}
+
+function applyLlmSuggestion(taskId, status, reasoning, keySentences) {
+  const safeId = 'row-' + taskId.replace(/[^a-zA-Z0-9]/g, '-');
+  const tr = document.getElementById(safeId);
+  if (!tr) return;
+
+  // Add badge to title cell
+  if (!tr.querySelector('.llm-badge')) {
+    const badge = document.createElement('span');
+    badge.className = 'llm-badge';
+    badge.textContent = `✦ LLM: ${status}`;
+    tr.cells[0].appendChild(badge);
+  }
+
+  // B — flash row green to signal an upgrade landed
+  tr.classList.remove('llm-flash-upgrade');
+  void tr.offsetWidth; // force reflow to restart animation
+  tr.classList.add('llm-flash-upgrade');
+  tr.addEventListener('animationend', () => tr.classList.remove('llm-flash-upgrade'), { once: true });
+
+  // Remove any existing llm-row sibling
+  const existing = tr.nextElementSibling;
+  if (existing && existing.classList.contains('llm-row')) existing.remove();
+
+  // Insert suggestion row — C: slide-in via .llm-row CSS animation
+  const llmRow = document.createElement('tr');
+  llmRow.className = 'llm-row';
+  const snippets = (keySentences || [])
+    .map(s => `<div class="evidence-snippet">${escHtml(s)}</div>`).join('');
+  llmRow.innerHTML = `<td colspan="9"><div class="llm-panel">
+    <div class="llm-reasoning">LLM suggests: <strong>${escHtml(status)}</strong> — ${escHtml(reasoning)}</div>
+    ${snippets}
+    <button class="llm-accept-btn" onclick="acceptLlmSuggestion('${escAttr(taskId)}','${escAttr(status)}',this)">Accept suggestion</button>
+    <button class="llm-dismiss-btn" onclick="this.closest('tr').remove();this.closest('tr')?.querySelector('.llm-badge')?.remove()">Dismiss</button>
+  </div></td>`;
+  tr.after(llmRow);
+}
+
+function acceptLlmSuggestion(taskId, status, btn) {
+  const result = allResults.find(r => r.task_id === taskId);
+  if (!result) return;
+  result.override = status;
+
+  const tr = btn.closest('tr').previousElementSibling;
+  if (!tr) return;
+  const eff = status;
+  tr.dataset.eff = eff;
+  tr.className   = `task-row row-${eff.toLowerCase()}`;
+  const statusIcon = eff === 'COVERED' ? '✅' : eff === 'PARTIAL' ? '⚠️' : '❌';
+  const statusTd   = tr.cells[5];
+  statusTd.innerHTML = `<span class="status-icon">${statusIcon}</span>${eff}`;
+
+  const sel = tr.querySelector('.override-select');
+  if (sel) sel.value = status;
+
+  const badge = tr.querySelector('.llm-badge');
+  if (badge) { badge.textContent = `✦ LLM: ${eff} ✓`; badge.style.background = '#dcfce7'; badge.style.color = '#15803d'; }
+
+  btn.closest('tr').remove();
+  refreshSectionHeader(tr.closest('.schedule-section'));
+  refreshSummary();
+  applyFilter();
+
+  // D — pulse the Covered KPI card to signal the change
+  const covEl = document.getElementById('kpiCovered');
+  if (covEl) {
+    const card = covEl.closest('.kpi-card');
+    if (card) {
+      card.classList.remove('kpi-pulse');
+      void card.offsetWidth;
+      card.classList.add('kpi-pulse');
+      card.addEventListener('animationend', () => card.classList.remove('kpi-pulse'), { once: true });
+    }
+  }
+}
+
+// ─── Task presence scoring ────────────────────────────────────────────────────
+function taskPresence(task, contractIndex) {
+  const titleToks = tokenise(task.title);
+  const notesToks = tokenise(task.notes || '');
+
+  const titleTerms = [...titleToks, ...ngrams(titleToks, 2), ...ngrams(titleToks, 3)];
+  const notesTerms = [...notesToks, ...ngrams(notesToks, 2)];
+
+  if (titleTerms.length === 0) return 0;
+
+  const titleHits = titleTerms.filter(t =>
+    contractIndex.has(t) || (!t.includes(' ') && fuzzyInContract(t))
+  ).length;
+  const notesHits = notesTerms.filter(t =>
+    contractIndex.has(t) || (!t.includes(' ') && fuzzyInContract(t))
+  ).length;
+
+  const titleScore = titleHits / titleTerms.length;
+  const notesBoost = notesTerms.length > 0 ? (notesHits / notesTerms.length) * 0.5 : 0;
+  const raw = Math.min(1.0, titleScore + notesBoost);
+
+  // Short-title guard: ≤2 meaningful tokens → cap at PARTIAL max
+  if (titleToks.length <= 2) return Math.min(raw, 0.49);
+
+  return raw;
+}
+
+// ─── Frequency extraction ─────────────────────────────────────────────────────
+const FREQ_PATTERNS = [
+  { regex: /\bdaily\b/i,                                                                                      days: 1,    label: 'Daily'       },
+  { regex: /\bweekly\b/i,                                                                                     days: 7,    label: 'Weekly'      },
+  { regex: /\bfortnightly|bi.?weekly|every\s+(two|2)\s+weeks?\b/i,                                           days: 14,   label: 'Fortnightly' },
+  { regex: /\bmonthly|every\s+month\b/i,                                                                      days: 30,   label: 'Monthly'     },
+  { regex: /\bevery\s+(other|2nd|second)\s+month\b/i,                                                         days: 61,   label: '2-Monthly'   },
+  { regex: /\bquarterly|every\s+(3|three)\s+months?\b|\b(4|four)\s+visits?\s+(per\s+)?ann(um|ually?)\b/i,    days: 91,   label: 'Quarterly'   },
+  { regex: /\b6.monthly|every\s+(6|six)\s+months?\b|bi.?annual\b|\b(2|two)\s+[x×]?\s*visits?\s+(per\s+)?(year|ann(um|ually?))\b|\btwice\s+(a\s+)?(year\b|ann)|\b(approx\.?\s*)?(6|six)\s+months?\s+apart\b/i, days: 182, label: '6-Monthly' },
+  { regex: /\bannual|yearly|every\s+(12|twelve)\s+months?\b|\b(1|one)\s+[x×]\s*visits?\s+(per\s+)?(year|ann(um|ually?))\b/i, days: 365, label: 'Annual' },
+  { regex: /\bevery\s+(2|two)\s+years?\b/i,                                                                   days: 730,  label: '2-Yearly'    },
+  { regex: /\bevery\s+(5|five)\s+years?\b/i,                                                                  days: 1826, label: '5-Yearly'    },
+];
+
+// Strip sentences that describe billing/payment cadence rather than maintenance frequency.
+// Prevents patterns like "invoiced twice yearly" matching as a 6-monthly maintenance visit.
+function stripBillingText(text) {
+  return text.split(/[.\n]/).filter(s =>
+    !/invoic|billed\s+at|charged\s+at|payment\s+term/i.test(s)
+  ).join(' ');
+}
+
+// Returns all matched frequency patterns sorted ascending (most frequent first)
+function contractFrequency(text) {
+  const freqText = stripBillingText(text);
+  return FREQ_PATTERNS
+    .filter(p => p.regex.test(freqText))
+    .sort((a, b) => a.days - b.days);
+}
+
+// ─── Assess a single task ─────────────────────────────────────────────────────
+function assessTask(task, contractIndex, contractFreqDays) {
+  const score  = taskPresence(task, contractIndex);
+  const status = score >= 0.5 ? 'COVERED' : score >= 0.25 ? 'PARTIAL' : 'MISSING';
+  let freqOk;
+  if (!task.frequency_days || !contractFreqDays) {
+    freqOk = 'UNKNOWN';
+  } else {
+    freqOk = contractFreqDays <= task.frequency_days ? 'COMPLIANT' : 'NON_COMPLIANT';
+  }
+  const evidence = gatherEvidence(task, status);
+  return {
+    task_id:          task.task_id,
+    title:            task.title || '(untitled)',
+    criticality_norm: task.criticality_norm || null,
+    safety_flag:      task.safety_flag,
+    required_freq:    task.frequency || null,
+    required_days:    task.frequency_days,
+    skill_required:   task.skill_code || null,
+    confidence:       Math.round(score * 100),
+    status,
+    override:         null,
+    freq_status:      freqOk,
+    schedule_ref:     task.schedule_ref,
+    schedule_title:   task.schedule_title,
+    source:           task.source,
+    evidence,
+  };
+}
+
+// ─── Overall verdict ──────────────────────────────────────────────────────────
+function computeVerdict(results) {
+  const effective = results.map(r => ({ ...r, effStatus: r.override ?? r.status }));
+  const highMissing = effective.filter(r => r.criticality_norm === 'HIGH' && r.effStatus === 'MISSING');
+  if (highMissing.length > 0) return 'REJECT AND RENEGOTIATE';
+  const covered = effective.filter(r => r.effStatus !== 'MISSING').length;
+  const pct = effective.length > 0 ? covered / effective.length : 0;
+  if (pct >= 0.80) return 'ACCEPTABLE';
+  if (pct >= 0.60) return 'NEEDS NEGOTIATION';
+  return 'REJECT AND RENEGOTIATE';
+}
+
+// Returns the specific reason behind the verdict — used for accurate descriptions.
+function verdictReason(results) {
+  const effective = results.map(r => ({ ...r, effStatus: r.override ?? r.status }));
+  const highMissing = effective.filter(r => r.criticality_norm === 'HIGH' && r.effStatus === 'MISSING');
+  if (highMissing.length > 0) return 'high_missing';
+  const covered = effective.filter(r => r.effStatus !== 'MISSING').length;
+  const pct = effective.length > 0 ? covered / effective.length : 0;
+  if (pct >= 0.80) return 'acceptable';
+  if (pct >= 0.60) return 'needs_negotiation';
+  return 'low_coverage';
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let tasksByRef    = {};
+let allResults    = [];
+let currentFilter = 'all';
+let currentSearch = '';
+let sortState     = { col: null, dir: 'asc' };
+
+// ─── LLM result cache (localStorage) ─────────────────────────────────────────
+const LLM_CACHE_KEY = 'ppm_llm_cache_v10';
+const LLM_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+function contractHash(text) {
+  // FNV-1a 32-bit — fast, no dependencies
+  let h = 0x811c9dc5;
+  for (let i = 0; i < Math.min(text.length, 4000); i++) {
+    h ^= text.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0;
+  }
+  return h.toString(16);
+}
+
+const llmCache = {
+  _data: null,
+  _load() {
+    if (this._data) return;
+    try { this._data = JSON.parse(localStorage.getItem(LLM_CACHE_KEY) || '{}'); }
+    catch { this._data = {}; }
+    // Evict expired
+    const now = Date.now();
+    for (const k of Object.keys(this._data)) {
+      if (now - this._data[k].ts > LLM_CACHE_TTL) delete this._data[k];
+    }
+  },
+  key(taskId, cHash) { return `${taskId}:${cHash}`; },
+  get(taskId, cHash) {
+    this._load();
+    return this._data[this.key(taskId, cHash)] || null;
+  },
+  set(taskId, cHash, value) {
+    this._load();
+    this._data[this.key(taskId, cHash)] = { ...value, ts: Date.now() };
+    try { localStorage.setItem(LLM_CACHE_KEY, JSON.stringify(this._data)); } catch {}
+  },
+};
+
+// ─── Data loading ─────────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const resp = await fetch('/canonical_tasks.json');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+    const tasks = await resp.json();
+    for (const t of tasks) {
+      if (!tasksByRef[t.schedule_ref]) tasksByRef[t.schedule_ref] = [];
+      tasksByRef[t.schedule_ref].push(t);
+    }
+    document.getElementById('loadingBanner').style.display = 'none';
+    document.getElementById('mainUI').style.display = '';
+    updateRefBox();
+    checkRunReady();
+  } catch (e) {
+    document.getElementById('loadingBanner').style.display = 'none';
+    showError(
+      'Failed to load canonical_tasks.json: ' + e.message +
+      '\n\nMake sure you launched via:\n  python3 serve.py\n\n' +
+      'Opening the HTML file directly (file://) will not work — the browser blocks local file fetches.'
+    );
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.textContent = msg;
+  el.style.display = '';
+}
+
+// ─── System tile selection ────────────────────────────────────────────────────
+function selectSystem(value) {
+  document.getElementById('systemSelect').value = value;
+  document.querySelectorAll('.sys-tile').forEach(t => {
+    const on = t.dataset.value === value;
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  updateRefBox();
+  checkRunReady();
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+function updateRefBox() {
+  const sys = document.getElementById('systemSelect').value;
+  const el = document.getElementById('refList');
+  if (!sys || !SYSTEM_REFS[sys]) { el.textContent = 'Select a system to see applicable schedules.'; return; }
+  const refs = SYSTEM_REFS[sys];
+  let html = '';
+  if (refs.htm06.length) html += `<b>HTM 06:</b> ${refs.htm06.join(', ')}<br>`;
+  if (refs.sfg20.length) html += `<b>SFG20:</b> ${refs.sfg20.join(', ')}`;
+  el.innerHTML = html || 'No schedules mapped.';
+}
+
+function checkRunReady() {
+  const sys  = document.getElementById('systemSelect').value;
+  const text = document.getElementById('contractText').value.trim();
+  document.getElementById('runBtn').disabled = !(sys && text.length > 10 && Object.keys(tasksByRef).length > 0);
+}
+
+document.getElementById('systemSelect').addEventListener('change', () => { updateRefBox(); checkRunReady(); });
+document.getElementById('contractText').addEventListener('input', () => { checkRunReady(); autoExtractQuoteRef(); });
+
+function autoExtractQuoteRef() {
+  const el = document.getElementById('quoteRefInput');
+  // Don't overwrite if the user has manually edited the field
+  if (el.dataset.userEdited === 'true') return;
+  const text = document.getElementById('contractText').value;
+  if (!text.trim()) { el.value = ''; return; }
+
+  const parts = [];
+
+  // Company name — first non-empty line that looks like a name (not a date/number-only line)
+  const firstLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2 && l.length < 80 && !/^\d/.test(l));
+  if (firstLines[0]) parts.push(firstLines[0]);
+
+  // Quote / reference number
+  const refM = text.match(/(?:quotation|quote|ref(?:erence)?|order|job|no\.?)[^\d\n]{0,10}([\w\d\-\/]{4,20})/i)
+             || text.match(/\b([A-Z]{2,5}[\-\s]?\d{4,10})\b/);
+  if (refM) { const ref = refM[1].trim(); if (!parts.some(p => p.includes(ref))) parts.push(ref); }
+
+  // Date — DD/MM/YYYY or Month YYYY or YYYY-MM-DD
+  const dateM = text.match(/\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\b/)
+             || text.match(/\b(\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{4})\b/i)
+             || text.match(/\b((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{4})\b/i);
+  if (dateM) parts.push(dateM[1]);
+
+  el.value = parts.join(' · ');
+}
+
+document.getElementById('quoteRefInput').addEventListener('input', function() {
+  this.dataset.userEdited = 'true';
+});
+
+function getQuoteRef() {
+  return document.getElementById('quoteRefInput').value.trim();
+}
+
+function exportFileSlug() {
+  const ref  = getQuoteRef();
+  const date = new Date().toISOString().slice(0, 10);
+  const safe = ref ? ref.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() : '';
+  return safe ? `ppm_${safe}_${date}` : `ppm_compliance_report_${date}`;
+}
+
+function setUploadStatus(msg, isError) {
+  const el = document.getElementById('uploadStatus');
+  el.textContent = msg;
+  el.classList.toggle('error', !!isError);
+  el.style.display = msg ? 'block' : 'none';
+}
+
+function setUploadLoading(on) {
+  document.getElementById('uploadLoading').style.display = on ? 'block' : 'none';
+}
+
+async function handleFileUpload(file) {
+  const existing = document.getElementById('contractText').value.trim();
+  if (existing.length > 10 && !confirm('Replace existing contract text with uploaded file?')) {
+    document.getElementById('fileInput').value = '';
+    return;
+  }
+
+  setUploadStatus('');
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'txt') {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        document.getElementById('contractText').value = e.target.result;
+        setUploadStatus('Loaded: ' + file.name);
+        document.getElementById('quoteRefInput').dataset.userEdited = '';
+        checkRunReady();
+        autoExtractQuoteRef();
+        resolve();
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  if (ext !== 'pdf' && ext !== 'docx') {
+    setUploadStatus('Unsupported file type — use .pdf, .docx or .txt', true);
+    return;
+  }
+
+  setUploadLoading(true);
+  try {
+    const resp = await fetch(`/extract?name=${encodeURIComponent(file.name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: file,
+    });
+    const json = await resp.json();
+    if (!resp.ok) {
+      setUploadStatus(json.error || 'Server error', true);
+      return;
+    }
+    document.getElementById('contractText').value = json.text;
+    setUploadStatus('Loaded: ' + file.name);
+    document.getElementById('quoteRefInput').dataset.userEdited = '';
+    checkRunReady();
+    autoExtractQuoteRef();
+  } catch (e) {
+    setUploadStatus('Could not reach server — is serve.py running?', true);
+  } finally {
+    setUploadLoading(false);
+  }
+}
+
+// ─── Drop zone ────────────────────────────────────────────────────────────────
+(function() {
+  const zone  = document.getElementById('dropZone');
+  const input = document.getElementById('fileInput');
+  const icon  = document.getElementById('dzIcon');
+  const label = document.getElementById('dzLabel');
+  const fname = document.getElementById('dzFilename');
+
+  function setZoneState(state, filename) {
+    zone.classList.remove('dz-over', 'dz-ok', 'dz-error');
+    if (state === 'over')  { zone.classList.add('dz-over');  icon.textContent = '📂'; label.textContent = 'Release to upload'; }
+    if (state === 'ok')    { zone.classList.add('dz-ok');    icon.textContent = '✅'; label.textContent = 'File loaded'; }
+    if (state === 'error') { zone.classList.add('dz-error'); icon.textContent = '❌'; label.textContent = 'Upload failed'; }
+    if (state === 'idle')  { icon.textContent = '📄'; label.textContent = 'Drop file here or click to browse'; }
+    fname.style.display = filename ? 'block' : 'none';
+    if (filename) fname.textContent = filename;
+  }
+
+  // Drag events — prevent browser default (open file)
+  zone.addEventListener('dragover',  e => { e.preventDefault(); setZoneState('over'); });
+  zone.addEventListener('dragleave', e => { if (!zone.contains(e.relatedTarget)) setZoneState('idle'); });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    setZoneState('idle');
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  });
+
+  input.addEventListener('change', function() {
+    const file = this.files[0];
+    if (file) processFile(file);
+  });
+
+  async function processFile(file) {
+    setZoneState('idle', file.name);
+    await handleFileUpload(file);
+    // Reflect success/error on zone after handleFileUpload resolves
+    const statusEl = document.getElementById('uploadStatus');
+    if (statusEl.classList.contains('error')) {
+      setZoneState('error', file.name);
+    } else {
+      setZoneState('ok', file.name);
+    }
+  }
+})();
+
+document.getElementById('filterInput').addEventListener('input', function() {
+  currentSearch = this.value.toLowerCase();
+  applyFilter();
+});
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilter();
+}
+
+function applyFilter() {
+  if (!allResults.length) return;
+  document.querySelectorAll('tr.task-row').forEach(tr => {
+    const eff   = tr.dataset.eff;
+    const crit  = tr.dataset.crit;
+    const title = tr.dataset.title || '';
+    let show = true;
+    if (currentFilter === 'high'    && crit !== 'HIGH')    show = false;
+    if (currentFilter === 'missing' && eff  !== 'MISSING') show = false;
+    if (currentSearch && !title.includes(currentSearch))   show = false;
+    tr.classList.toggle('row-hidden', !show);
+  });
+}
+
+function updateProgress(done, total) {
+  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressMsg').textContent = `Analysing tasks… ${done} / ${total}`;
+}
+
+// ─── Dark mode toggle ─────────────────────────────────────────────────────────
+let darkMode = false;
+function toggleDark() {
+  darkMode = !darkMode;
+  document.documentElement.classList.toggle('dark', darkMode);
+  document.getElementById('darkToggle').textContent = `${darkMode ? '☀️' : '🌙'} Dark mode: ${darkMode ? 'ON' : 'OFF'}`;
+  try { localStorage.setItem('ppm_dark', darkMode ? '1' : '0'); } catch {}
+}
+// Apply saved preference (class already set by inline script in <head> if present;
+// here we sync the button label which is available since script is at end of body)
+(function () {
+  try {
+    if (localStorage.getItem('ppm_dark') === '1') {
+      darkMode = true;
+      document.documentElement.classList.add('dark');
+      const btn = document.getElementById('darkToggle');
+      if (btn) btn.textContent = '☀️ Dark mode: ON';
+    }
+  } catch {}
+})();
+
+// ─── Colorblind toggle ────────────────────────────────────────────────────────
+let cbMode = false;
+function toggleColorblind() {
+  cbMode = !cbMode;
+  document.body.classList.toggle('cb', cbMode);
+  document.getElementById('cbToggle').textContent = `👁 Colorblind mode: ${cbMode ? 'ON' : 'OFF'}`;
+}
+
+// ─── Full-screen editor ───────────────────────────────────────────────────────
+function openEditor() {
+  document.getElementById('contractTextFull').value = document.getElementById('contractText').value;
+  document.getElementById('editorModal').style.display = 'flex';
+  document.getElementById('contractTextFull').focus();
+}
+function closeEditor() {
+  document.getElementById('contractText').value = document.getElementById('contractTextFull').value;
+  document.getElementById('editorModal').style.display = 'none';
+  checkRunReady();
+}
+// Close modal on backdrop click
+document.getElementById('editorModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditor();
+});
+// Close on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('editorModal').style.display !== 'none') closeEditor();
+});
+
+// ─── Scroll to task row from critical gaps ────────────────────────────────────
+function scrollToTask(taskId) {
+  const safeId = 'row-' + taskId.replace(/[^a-zA-Z0-9]/g, '-');
+  const tr = document.getElementById(safeId);
+  if (!tr) return;
+  // Expand the parent schedule section if collapsed
+  const body = tr.closest('.schedule-body');
+  if (body && !body.classList.contains('open')) {
+    body.classList.add('open');
+    const header = body.previousElementSibling;
+    if (header) {
+      header.setAttribute('aria-expanded', 'true');
+      const chev = header.querySelector('.chevron');
+      if (chev) chev.classList.add('open');
+    }
+  }
+  tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  tr.classList.remove('row-pulse');
+  void tr.offsetWidth; // force reflow to restart animation
+  tr.classList.add('row-pulse');
+  setTimeout(() => tr.classList.remove('row-pulse'), 1500);
+}
+
+// ─── Table sorting ────────────────────────────────────────────────────────────
+const COL_KEYS = ['title','task_id','required_freq','criticality_norm','skill_required','status','confidence','freq_status'];
+
+function sortTable(tbody, colIdx) {
+  const key = COL_KEYS[colIdx];
+  if (!key) return;
+
+  if (sortState.col === key) {
+    sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortState.col = key;
+    sortState.dir = 'asc';
+  }
+
+  // Update header arrows
+  tbody.closest('table').querySelectorAll('th').forEach((th, i) => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (i === colIdx) th.classList.add(sortState.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+  });
+
+  const rows = [...tbody.querySelectorAll('tr.task-row')];
+  const dir = sortState.dir === 'asc' ? 1 : -1;
+  rows.sort((a, b) => {
+    const av = a.dataset[key] || a.cells[colIdx]?.textContent || '';
+    const bv = b.dataset[key] || b.cells[colIdx]?.textContent || '';
+    // Numeric sort for confidence
+    if (key === 'confidence') return (parseInt(av) - parseInt(bv)) * dir;
+    return av.localeCompare(bv) * dir;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// ─── Main engine run ──────────────────────────────────────────────────────────
+document.getElementById('runBtn').addEventListener('click', runCheck);
+
+function runCheck() {
+  document.getElementById('errorBox').style.display = 'none';
+  document.getElementById('results').style.display = 'none';
+
+  const sysKey = document.getElementById('systemSelect').value;
+  if (!sysKey) { showError('Please select a system.'); return; }
+  const contractText = document.getElementById('contractText').value;
+  if (!contractText.trim()) { showError('Please provide contract text.'); return; }
+
+  const refs    = SYSTEM_REFS[sysKey];
+  const allRefs = [...refs.sfg20, ...refs.htm06];
+
+  const systemTasks = [];
+  for (const ref of allRefs) {
+    for (const t of (tasksByRef[ref] || [])) {
+      if (!t.withdrawn) systemTasks.push(t);
+    }
+  }
+  if (systemTasks.length === 0) {
+    showError('No tasks found for the selected system. Check canonical_tasks.json contains matching schedule refs.');
+    return;
+  }
+
+  const contractIndex = buildIndex(contractText); // also sets contractFuzzyTokens
+  const freqHits      = contractFrequency(contractText);
+  const contractFreqDays = freqHits.length ? freqHits[0].days : null;
+
+  document.getElementById('progressWrap').style.display = '';
+  document.getElementById('runBtn').disabled = true;
+  allResults = [];
+  sortState  = { col: null, dir: 'asc' };
+
+  runEngineAsync(systemTasks, contractIndex, contractFreqDays, results => {
+    allResults = results;
+    document.getElementById('progressWrap').style.display = 'none';
+    document.getElementById('runBtn').disabled = false;
+    renderResults(sysKey, freqHits, contractFreqDays);
+  });
+}
+
+function runEngineAsync(tasks, contractIndex, contractFreqDays, onDone) {
+  const results = [];
+  const BATCH   = 100;
+  let i = 0;
+  function step() {
+    const end = Math.min(i + BATCH, tasks.length);
+    while (i < end) { results.push(assessTask(tasks[i], contractIndex, contractFreqDays)); i++; }
+    updateProgress(i, tasks.length);
+    if (i < tasks.length) requestAnimationFrame(step);
+    else onDone(results);
+  }
+  requestAnimationFrame(step);
+}
+
+// ─── Render results ───────────────────────────────────────────────────────────
+function effectiveStatus(r) { return r.override ?? r.status; }
+
+function verdictClass(v) {
+  return v === 'ACCEPTABLE' ? 'verdict-ACCEPTABLE' :
+         v === 'NEEDS NEGOTIATION' ? 'verdict-NEEDS_NEGOTIATION' :
+         'verdict-REJECT';
+}
+
+function buildSummaryHTML(freqHits) {
+  const totalTasks = allResults.length;
+  const covCount   = allResults.filter(r => effectiveStatus(r) === 'COVERED').length;
+  const parCount   = allResults.filter(r => effectiveStatus(r) === 'PARTIAL').length;
+  const misCount   = allResults.filter(r => effectiveStatus(r) === 'MISSING').length;
+  const highAll    = allResults.filter(r => r.criticality_norm === 'HIGH');
+  const highMiss   = highAll.filter(r => effectiveStatus(r) === 'MISSING');
+  const verdict    = computeVerdict(allResults);
+  const freqStr    = freqHits.length ? freqHits.map(f => f.label).join(' · ') : 'None detected';
+  const qRef       = getQuoteRef();
+  const sysKey     = document.getElementById('systemSelect').value;
+  const sysLabel   = SYSTEM_REFS[sysKey]?.label || 'PPM Assessment';
+
+  // Verdict colour — sits on dark navy header so use muted tinted backgrounds
+  const VC = verdict === 'ACCEPTABLE'
+    ? 'rgba(22,163,74,.85)'
+    : verdict === 'NEEDS NEGOTIATION'
+    ? 'rgba(202,138,4,.9)'
+    : 'rgba(220,38,38,.85)';
+  const highGapClass = highMiss.length > 0 ? 'kpi-danger' : 'kpi-green';
+
+  // Icon bg/colour pairs — matching sys-tile --b/--c variables
+  const iconTasks  = { bg: '#e8f3fb', fg: '#1a6b8a' };
+  const iconCov    = { bg: '#dcfce7', fg: '#16a34a' };
+  const iconGaps   = highMiss.length > 0 ? { bg: '#fee2e2', fg: '#dc2626' } : { bg: '#dcfce7', fg: '#16a34a' };
+
+  const critRows = ['HIGH','MEDIUM','LOW'].map(key => {
+    const col = key === 'HIGH' ? '#dc2626' : key === 'MEDIUM' ? '#d97706' : '#16a34a';
+    const grp = allResults.filter(r => r.criticality_norm === key);
+    if (!grp.length) return '';
+    const cov = grp.filter(r => effectiveStatus(r) !== 'MISSING').length;
+    return `<div class="crit-row">
+      <span class="crit-row-lbl" style="color:${col}">${key}</span>
+      <div class="crit-row-bar"><div class="crit-row-fill" style="background:${col}" data-w="${Math.round(cov/grp.length*100)}"></div></div>
+      <span class="crit-row-pct">${cov}/${grp.length}</span>
+    </div>`;
+  }).join('');
+
+  return `<div class="dash-panel">
+    <div class="dash-hdr">
+      <div class="dash-hdr-left">
+        <span class="dash-hdr-eyebrow">${escHtml(sysLabel)}</span>
+        <span class="dash-hdr-title">${qRef ? escHtml(qRef) : 'PPM Compliance Assessment'}</span>
+      </div>
+      <span class="dash-hdr-verdict" style="background:${VC}">${escHtml(verdict)}</span>
+    </div>
+    <div class="dash-body">
+      <div class="dash-donut-col">
+        <svg class="dash-donut-svg" viewBox="0 0 120 120" role="img" aria-label="Coverage donut chart">
+          <circle class="donut-track" cx="60" cy="60" r="48"/>
+          <circle class="donut-seg donut-missing" cx="60" cy="60" r="48" transform="rotate(-90 60 60)" stroke-dasharray="0 302" id="donutMissing"/>
+          <circle class="donut-seg donut-partial"  cx="60" cy="60" r="48" transform="rotate(-90 60 60)" stroke-dasharray="0 302" id="donutPartial"/>
+          <circle class="donut-seg donut-covered"  cx="60" cy="60" r="48" transform="rotate(-90 60 60)" stroke-dasharray="0 302" id="donutCovered"/>
+          <text class="donut-label" x="60" y="56" id="donutPct">—</text>
+          <text class="donut-sub"   x="60" y="72">coverage</text>
+        </svg>
+      </div>
+      <div class="dash-kpis">
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:${iconTasks.bg};color:${iconTasks.fg}">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
+          </div>
+          <div class="kpi-num" id="kpiTotal">—</div>
+          <div class="kpi-lbl">Tasks</div>
+        </div>
+        <div class="kpi-card kpi-green">
+          <div class="kpi-icon" style="background:${iconCov.bg};color:${iconCov.fg}">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+          <div class="kpi-num" id="kpiCovered">—</div>
+          <div class="kpi-lbl">Covered</div>
+        </div>
+        <div class="kpi-card ${highGapClass}">
+          <div class="kpi-icon" style="background:${iconGaps.bg};color:${iconGaps.fg}">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+          </div>
+          <div class="kpi-num" id="kpiHighGaps">—</div>
+          <div class="kpi-lbl">HIGH gaps</div>
+        </div>
+      </div>
+      <div class="dash-detail">
+        <div>
+          <div class="dash-detail-lbl">Coverage breakdown</div>
+          <div class="dash-cov-bar">
+            <div class="dash-seg-cov" id="segCov"></div>
+            <div class="dash-seg-par" id="segPar"></div>
+            <div class="dash-seg-mis" id="segMis"></div>
+          </div>
+        </div>
+        <div class="dash-legend">
+          <span><span class="leg-dot leg-cov"></span><b id="legCovN">—</b> covered</span>
+          <span><span class="leg-dot leg-par"></span><b id="legParN">—</b> partial</span>
+          <span><span class="leg-dot leg-mis"></span><b id="legMisN">—</b> missing</span>
+        </div>
+        <div>
+          <div class="dash-detail-lbl">By criticality</div>
+          <div class="dash-crit-wrap">${critRows}</div>
+        </div>
+        <div><span class="dash-freq-chip">🕐 ${escHtml(freqStr)}</span></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function animateDashboard() {
+  const total    = allResults.length;
+  if (!total) return;
+  const covN     = allResults.filter(r => effectiveStatus(r) === 'COVERED').length;
+  const parN     = allResults.filter(r => effectiveStatus(r) === 'PARTIAL').length;
+  const misN     = allResults.filter(r => effectiveStatus(r) === 'MISSING').length;
+  const highMiss = allResults.filter(r => r.criticality_norm === 'HIGH' && effectiveStatus(r) === 'MISSING').length;
+  const covPct   = Math.round((covN + parN) / total * 100);
+  const C        = 301.59;
+  const covDash  = covN / total * C;
+  const parDash  = parN / total * C;
+  const misDash  = misN / total * C;
+
+  // ── Donut — transition from current arcs (no reset to zero) ──────────
+  const dCov = document.getElementById('donutCovered');
+  const dPar = document.getElementById('donutPartial');
+  const dMis = document.getElementById('donutMissing');
+  if (dCov && dPar && dMis) {
+    // Update offsets instantly (repositioning), then animate lengths
+    [dCov, dPar, dMis].forEach(el => el.style.transition = 'none');
+    dCov.style['stroke-dashoffset'] = '0';
+    dPar.style['stroke-dashoffset'] = `-${covDash}`;
+    dMis.style['stroke-dashoffset'] = `-${covDash + parDash}`;
+    setTimeout(() => {
+      const tr = 'stroke-dasharray 0.8s cubic-bezier(.4,0,.2,1)';
+      [dCov, dPar, dMis].forEach(el => el.style.transition = tr);
+      dCov.style['stroke-dasharray'] = `${covDash} ${C}`;
+      dPar.style['stroke-dasharray'] = `${parDash} ${C}`;
+      dMis.style['stroke-dasharray'] = `${misDash} ${C}`;
+    }, 40);
+  }
+  const pctEl = document.getElementById('donutPct');
+  if (pctEl) pctEl.textContent = covPct + '%';
+
+  // ── KPI counter — animate from current displayed value (D) ────────────
+  function countUp(id, target) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const from = parseInt(el.textContent) || 0;
+    if (from === target) return;
+    if (target === 0) { el.textContent = '0'; return; }
+    const dur = Math.max(300, Math.min(700, Math.abs(target - from) * 120));
+    const t0  = performance.now();
+    (function frame(ts) {
+      const p = Math.min((ts - t0) / dur, 1);
+      el.textContent = Math.round(from + (target - from) * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(frame);
+    })(performance.now());
+  }
+  countUp('kpiTotal',    total);
+  countUp('kpiCovered',  covN + parN);
+  countUp('kpiHighGaps', highMiss);
+
+  // ── Legend counts ──────────────────────────────────────────────────────
+  const lc = document.getElementById('legCovN'); if (lc) lc.textContent = covN;
+  const lp = document.getElementById('legParN'); if (lp) lp.textContent = parN;
+  const lm = document.getElementById('legMisN'); if (lm) lm.textContent = misN;
+
+  // ── Stacked bar + crit fills (slight delay so CSS transition is visible) ─
+  setTimeout(() => {
+    const pct = n => (n / total * 100).toFixed(1) + '%';
+    const sc = document.getElementById('segCov'); if (sc) sc.style.width = pct(covN);
+    const sp = document.getElementById('segPar'); if (sp) sp.style.width = pct(parN);
+    const sm = document.getElementById('segMis'); if (sm) sm.style.width = pct(misN);
+    document.querySelectorAll('.crit-row-fill').forEach(el => {
+      el.style.width = (el.dataset.w || 0) + '%';
+    });
+  }, 60);
+}
+
+function renderResults(sysKey, freqHits, contractFreqDays) {
+  const refs    = SYSTEM_REFS[sysKey];
+  const allRefs = [...refs.sfg20, ...refs.htm06];
+
+  document.getElementById('summaryBar').innerHTML = buildSummaryHTML(freqHits);
+
+  // Critical gaps
+  const highMissing = allResults.filter(r => r.criticality_norm === 'HIGH' && effectiveStatus(r) === 'MISSING');
+  if (highMissing.length > 0) {
+    document.getElementById('criticalGapsList').innerHTML = highMissing.map(r =>
+      `<li class="gap-link" onclick="scrollToTask('${escAttr(r.task_id)}')" title="Click to jump to this task">${r.task_id} — ${escHtml(r.title)} [${r.required_freq || '?'}, ${r.skill_required || '?'}]</li>`
+    ).join('');
+    document.getElementById('criticalGaps').style.display = '';
+  } else {
+    document.getElementById('criticalGaps').style.display = 'none';
+  }
+
+  // Schedule sections
+  const byRef = {};
+  for (const r of allResults) {
+    if (!byRef[r.schedule_ref]) byRef[r.schedule_ref] = [];
+    byRef[r.schedule_ref].push(r);
+  }
+  const container = document.getElementById('scheduleContainer');
+  container.innerHTML = '';
+  for (const ref of allRefs) {
+    const tasks = byRef[ref];
+    if (!tasks || tasks.length === 0) continue;
+    container.appendChild(buildScheduleSection(ref, tasks));
+  }
+
+  // Reset filters
+  currentFilter = 'all';
+  currentSearch = '';
+  document.getElementById('filterInput').value = '';
+  document.querySelectorAll('.filter-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.filter === 'all')
+  );
+
+  document.getElementById('results').style.display = '';
+  animateDashboard();
+}
+
+function buildScheduleSection(ref, tasks) {
+  const nCovered = tasks.filter(r => effectiveStatus(r) === 'COVERED').length;
+  const nPartial = tasks.filter(r => effectiveStatus(r) === 'PARTIAL').length;
+  const nMissing = tasks.filter(r => effectiveStatus(r) === 'MISSING').length;
+  const title    = tasks[0].schedule_title || ref;
+  const source   = tasks[0].source || '';
+
+  const section = document.createElement('div');
+  section.className = 'schedule-section';
+
+  const nTotal = tasks.length;
+  const hasCritMissing = tasks.some(r => r.criticality_norm === 'HIGH' && effectiveStatus(r) === 'MISSING');
+  const hasMissing     = tasks.some(r => effectiveStatus(r) === 'MISSING');
+  const accentColor    = hasCritMissing ? '#ef4444' : hasMissing ? '#f59e0b' : '#22c55e';
+  section.style.borderLeft = `3px solid ${accentColor}`;
+  section.style.borderRadius = '12px';
+
+  const miniBar = nTotal > 0 ? `<span class="sched-minibar" title="${nCovered} covered · ${nPartial} partial · ${nMissing} missing">
+    <span class="smb-cov" style="width:${(nCovered/nTotal*100).toFixed(1)}%"></span>
+    <span class="smb-par" style="width:${(nPartial/nTotal*100).toFixed(1)}%"></span>
+    <span class="smb-mis" style="width:${(nMissing/nTotal*100).toFixed(1)}%"></span>
+  </span>` : '';
+
+  const header = document.createElement('div');
+  header.className = 'schedule-header';
+  header.setAttribute('role', 'button');
+  header.setAttribute('aria-expanded', 'false');
+  header.innerHTML =
+    `<span class="schedule-header-left">${escHtml(ref)} — ${escHtml(title)} <small style="font-weight:normal;color:#888">(${source})</small></span>
+     <span class="schedule-header-right">
+       ${miniBar}
+       <span class="schedule-badge badge-covered">${nCovered} covered</span>
+       <span class="schedule-badge badge-partial">${nPartial} partial</span>
+       <span class="schedule-badge badge-missing">${nMissing} missing</span>
+       <span class="chevron">▼</span>
+     </span>`;
+
+  const body = document.createElement('div');
+  body.className = 'schedule-body';
+
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  const cols = ['Task','Task ID','Freq','Crit','Skill','Status','Confidence','Freq Check','Override'];
+  cols.forEach((c, i) => {
+    const th = document.createElement('th');
+    th.innerHTML = `${c}<span class="sort-arrow"></span>`;
+    if (i < COL_KEYS.length) {
+      th.onclick = () => sortTable(tbody, i);
+      th.title = `Sort by ${c}`;
+    }
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  for (const r of tasks) {
+    const eff = effectiveStatus(r);
+    const tr  = document.createElement('tr');
+    const safeId = 'row-' + r.task_id.replace(/[^a-zA-Z0-9]/g, '-');
+    tr.id        = safeId;
+    tr.className = `task-row row-${eff.toLowerCase()}`;
+    tr.dataset.eff        = eff;
+    tr.dataset.crit       = r.criticality_norm || '';
+    tr.dataset.title      = (r.title || '').toLowerCase();
+    tr.dataset.taskId     = r.task_id;
+    tr.dataset.confidence = r.confidence;
+    tr.dataset.freq_status = r.freq_status;
+
+    const statusIcon = eff === 'COVERED' ? '✅' : eff === 'PARTIAL' ? '⚠️' : '❌';
+    const critClass  = r.criticality_norm === 'HIGH' ? 'crit-high' :
+                       r.criticality_norm === 'MEDIUM' ? 'crit-medium' : 'crit-low';
+    const freqClass  = eff === 'MISSING' ? 'freq-unk' :
+                       r.freq_status === 'COMPLIANT'     ? 'freq-ok'  :
+                       r.freq_status === 'NON_COMPLIANT' ? 'freq-bad' : 'freq-unk';
+    const freqLabel  = eff === 'MISSING' ? '—' :
+                       r.freq_status === 'COMPLIANT'     ? '✓ Compliant' :
+                       r.freq_status === 'NON_COMPLIANT' ? '✗ Too low' : '— Unknown';
+
+    const evidenceBtn = r.evidence && r.evidence.length > 0
+      ? `<button class="evidence-btn" onclick="toggleEvidence(this)" aria-expanded="false">▶ evidence</button>`
+      : '';
+
+    tr.innerHTML = `
+      <td aria-label="Task: ${escAttr(r.title)} — Status: ${eff}">${escHtml(r.title)}${evidenceBtn}</td>
+      <td style="white-space:nowrap;color:#888">${escHtml(r.task_id)}</td>
+      <td style="white-space:nowrap">${escHtml(r.required_freq || '—')}</td>
+      <td class="${critClass}">${escHtml(r.criticality_norm || '—')}</td>
+      <td>${escHtml(r.skill_required || '—')}</td>
+      <td aria-label="Task: ${escAttr(r.title)} — Status: ${eff}"><span class="status-icon">${statusIcon}</span>${eff}</td>
+      <td><span class="conf-badge">${r.confidence}%</span></td>
+      <td class="${freqClass}">${freqLabel}</td>
+      <td>
+        <select class="override-select"
+          aria-label="Override status for: ${escAttr(r.title)}"
+          data-taskid="${escAttr(r.task_id)}"
+          onchange="applyOverride(this)">
+          <option value="">Auto</option>
+          <option value="COVERED">Covered</option>
+          <option value="PARTIAL">Partial</option>
+          <option value="MISSING">Missing</option>
+        </select>
+      </td>`;
+    tbody.appendChild(tr);
+
+    if (r.evidence && r.evidence.length > 0) {
+      const evRow = document.createElement('tr');
+      evRow.className = 'evidence-row';
+      evRow.style.display = 'none';
+      const snippets = r.evidence
+        .map(e => `<div class="evidence-snippet">${highlightEvidence(e.text, e.matchedTokens)}</div>`)
+        .join('');
+      evRow.innerHTML = `<td colspan="9"><div class="evidence-panel">${snippets}</div></td>`;
+      tbody.appendChild(evRow);
+    }
+  }
+
+  table.appendChild(tbody);
+  const tableScroll = document.createElement('div');
+  tableScroll.className = 'table-scroll';
+  tableScroll.appendChild(table);
+  body.appendChild(tableScroll);
+  section.appendChild(header);
+  section.appendChild(body);
+
+  header.addEventListener('click', () => {
+    const open = body.classList.toggle('open');
+    header.setAttribute('aria-expanded', open ? 'true' : 'false');
+    header.querySelector('.chevron').classList.toggle('open', open);
+  });
+
+  return section;
+}
+
+// ─── Section header refresh ───────────────────────────────────────────────────
+function refreshSectionHeader(section) {
+  if (!section) return;
+  const rows     = [...section.querySelectorAll('tr.task-row')];
+  const nTotal   = rows.length;
+  const nCovered = rows.filter(r => r.dataset.eff === 'COVERED').length;
+  const nPartial = rows.filter(r => r.dataset.eff === 'PARTIAL').length;
+  const nMissing = rows.filter(r => r.dataset.eff === 'MISSING').length;
+
+  const header = section.querySelector('.schedule-header');
+  if (!header) return;
+
+  // Badges
+  const bc = header.querySelector('.badge-covered');
+  const bp = header.querySelector('.badge-partial');
+  const bm = header.querySelector('.badge-missing');
+  if (bc) bc.textContent = `${nCovered} covered`;
+  if (bp) bp.textContent = `${nPartial} partial`;
+  if (bm) bm.textContent = `${nMissing} missing`;
+
+  // Minibar
+  if (nTotal > 0) {
+    const smbc = header.querySelector('.smb-cov');
+    const smbp = header.querySelector('.smb-par');
+    const smbm = header.querySelector('.smb-mis');
+    if (smbc) smbc.style.width = (nCovered / nTotal * 100).toFixed(1) + '%';
+    if (smbp) smbp.style.width = (nPartial / nTotal * 100).toFixed(1) + '%';
+    if (smbm) smbm.style.width = (nMissing / nTotal * 100).toFixed(1) + '%';
+    const mb = header.querySelector('.sched-minibar');
+    if (mb) mb.title = `${nCovered} covered · ${nPartial} partial · ${nMissing} missing`;
+  }
+
+  // Accent border — uses crit-high class on the row's cells (already in DOM)
+  const hasCritMissing = rows.some(r =>
+    r.dataset.eff === 'MISSING' && r.querySelector('.crit-high')
+  );
+  section.style.borderLeft = `3px solid ${
+    hasCritMissing ? '#ef4444' : nMissing > 0 ? '#f59e0b' : '#22c55e'
+  }`;
+}
+
+// ─── Override handling ────────────────────────────────────────────────────────
+function applyOverride(sel) {
+  const taskId = sel.dataset.taskid;
+  const val    = sel.value || null;
+  const result = allResults.find(r => r.task_id === taskId);
+  if (!result) return;
+  result.override = val;
+
+  const tr  = sel.closest('tr');
+  const eff = effectiveStatus(result);
+  tr.dataset.eff = eff;
+  tr.className   = `task-row row-${eff.toLowerCase()}`;
+
+  const statusIcon = eff === 'COVERED' ? '✅' : eff === 'PARTIAL' ? '⚠️' : '❌';
+  const statusTd   = tr.cells[5];
+  statusTd.innerHTML = `<span class="status-icon">${statusIcon}</span>${eff}`;
+  statusTd.setAttribute('aria-label', `Task: ${result.title} — Status: ${eff}`);
+
+  refreshSectionHeader(tr.closest('.schedule-section'));
+  refreshSummary();
+  applyFilter();
+}
+
+function refreshSummary() {
+  // Rebuild summary bar using last known freqHits (stored on summaryBar as data attr)
+  const bar = document.getElementById('summaryBar');
+  const freqHits = JSON.parse(bar.dataset.freqHits || '[]');
+  bar.innerHTML = buildSummaryHTML(freqHits);
+  bar.dataset.freqHits = JSON.stringify(freqHits);
+  animateDashboard();
+
+  const highMissing = allResults.filter(r => r.criticality_norm === 'HIGH' && effectiveStatus(r) === 'MISSING');
+  if (highMissing.length > 0) {
+    document.getElementById('criticalGapsList').innerHTML = highMissing.map(r =>
+      `<li class="gap-link" onclick="scrollToTask('${escAttr(r.task_id)}')" title="Click to jump to this task">${r.task_id} — ${escHtml(r.title)} [${r.required_freq || '?'}, ${r.skill_required || '?'}]</li>`
+    ).join('');
+    document.getElementById('criticalGaps').style.display = '';
+  } else {
+    document.getElementById('criticalGaps').style.display = 'none';
+  }
+}
+
+// Patch renderResults to store freqHits on summaryBar for refreshSummary
+const _origRenderResults = renderResults;
+// Override renderResults to stash freqHits
+function renderResults(sysKey, freqHits, contractFreqDays) {
+  const refs    = SYSTEM_REFS[sysKey];
+  const allRefs = [...refs.sfg20, ...refs.htm06];
+
+  const bar = document.getElementById('summaryBar');
+  bar.innerHTML = buildSummaryHTML(freqHits);
+  bar.dataset.freqHits = JSON.stringify(freqHits);
+
+  const highMissing = allResults.filter(r => r.criticality_norm === 'HIGH' && effectiveStatus(r) === 'MISSING');
+  if (highMissing.length > 0) {
+    document.getElementById('criticalGapsList').innerHTML = highMissing.map(r =>
+      `<li class="gap-link" onclick="scrollToTask('${escAttr(r.task_id)}')" title="Click to jump to this task">${r.task_id} — ${escHtml(r.title)} [${r.required_freq || '?'}, ${r.skill_required || '?'}]</li>`
+    ).join('');
+    document.getElementById('criticalGaps').style.display = '';
+  } else {
+    document.getElementById('criticalGaps').style.display = 'none';
+  }
+
+  const byRef = {};
+  for (const r of allResults) {
+    if (!byRef[r.schedule_ref]) byRef[r.schedule_ref] = [];
+    byRef[r.schedule_ref].push(r);
+  }
+  const container = document.getElementById('scheduleContainer');
+  container.innerHTML = '';
+  for (const ref of allRefs) {
+    const tasks = byRef[ref];
+    if (!tasks || tasks.length === 0) continue;
+    container.appendChild(buildScheduleSection(ref, tasks));
+  }
+
+  currentFilter = 'all';
+  currentSearch = '';
+  document.getElementById('filterInput').value = '';
+  document.querySelectorAll('.filter-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.filter === 'all')
+  );
+  document.getElementById('results').style.display = '';
+  checkLlmAvailability();
+  animateDashboard();
+}
+
+// ─── Exports ──────────────────────────────────────────────────────────────────
+function downloadFile(filename, content, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type: mime }));
+  a.download = filename;
+  a.click();
+}
+
+function exportTxt() {
+  const verdict  = computeVerdict(allResults);
+  const bar      = document.getElementById('summaryBar');
+  const freqHits = JSON.parse(bar.dataset.freqHits || '[]');
+  const freqStr  = freqHits.length ? freqHits.map(f => f.label).join(', ') : 'None detected';
+  const qRef  = getQuoteRef();
+  const lines = [
+    'PPM COMPLIANCE CHECKER — AUDIT REPORT',
+    '======================================',
+    `Generated:           ${new Date().toISOString()}`,
+    ...(qRef ? [`Contract / Quote ref: ${qRef}`] : []),
+    `Verdict:             ${verdict}`,
+    `Detected frequencies: ${freqStr}`,
+    '',
+  ];
+  for (const [ref, tasks] of Object.entries(groupByRef(allResults))) {
+    lines.push(`--- ${ref}: ${tasks[0].schedule_title} (${tasks[0].source}) ---`);
+    for (const r of tasks) {
+      const eff  = effectiveStatus(r);
+      const over = r.override ? ` [override: ${r.override}]` : '';
+      lines.push(`  [${eff}${over}] ${r.task_id} — ${r.title}`);
+      lines.push(`         Freq: ${r.required_freq || '?'} | Crit: ${r.criticality_norm || '?'} | Skill: ${r.skill_required || '?'} | Confidence: ${r.confidence}% | Freq check: ${r.freq_status}`);
+    }
+    lines.push('');
+  }
+  downloadFile(`${exportFileSlug()}.txt`, lines.join('\n'), 'text/plain');
+}
+
+function exportCsv() {
+  const qRef  = getQuoteRef();
+  const meta  = [
+    [`# PPM Compliance Report — ${new Date().toISOString()}`],
+    ...(qRef ? [[`# Contract / Quote ref: ${qRef}`]] : []),
+    [],
+  ];
+  const rows = [['task_id','schedule_ref','schedule_title','source','title','criticality_norm',
+    'safety_flag','frequency','required_days','skill_required','auto_status','override',
+    'effective_status','confidence','freq_status']];
+  for (const r of allResults) {
+    rows.push([
+      r.task_id, r.schedule_ref, r.schedule_title, r.source,
+      `"${(r.title||'').replace(/"/g,'""')}"`,
+      r.criticality_norm || '', r.safety_flag ? 'true' : 'false',
+      r.required_freq || '', r.required_days || '',
+      r.skill_required || '', r.status, r.override || '',
+      effectiveStatus(r), r.confidence, r.freq_status
+    ]);
+  }
+  downloadFile(`${exportFileSlug()}.csv`, [...meta, ...rows].map(r => r.join(',')).join('\n'), 'text/csv');
+}
+
+function exportJson() {
+  const bar      = document.getElementById('summaryBar');
+  const freqHits = JSON.parse(bar.dataset.freqHits || '[]');
+  const qRef  = getQuoteRef();
+  const out = {
+    generated: new Date().toISOString(),
+    ...(qRef ? { contract_ref: qRef } : {}),
+    verdict: computeVerdict(allResults),
+    detected_frequencies: freqHits.map(f => ({ label: f.label, days: f.days })),
+    tasks: allResults.map(r => ({ ...r, effective_status: effectiveStatus(r) })),
+  };
+  downloadFile(`${exportFileSlug()}.json`, JSON.stringify(out, null, 2), 'application/json');
+}
+
+function exportHtml() {
+  const bar       = document.getElementById('summaryBar');
+  const freqHits  = JSON.parse(bar.dataset.freqHits || '[]');
+  const freqStr   = freqHits.length ? freqHits.map(f => f.label).join(', ') : 'None detected';
+  const verdict   = computeVerdict(allResults);
+  const sysKey    = document.getElementById('systemSelect').value;
+  const sysLabel  = SYSTEM_REFS[sysKey]?.label || sysKey;
+  const total     = allResults.length;
+  const covCount  = allResults.filter(r => effectiveStatus(r) === 'COVERED').length;
+  const parCount  = allResults.filter(r => effectiveStatus(r) === 'PARTIAL').length;
+  const misCount  = allResults.filter(r => effectiveStatus(r) === 'MISSING').length;
+  const highAll   = allResults.filter(r => r.criticality_norm === 'HIGH');
+  const highMiss  = highAll.filter(r => effectiveStatus(r) === 'MISSING');
+  const covPct    = total > 0 ? Math.round((covCount + parCount) / total * 100) : 0;
+  const covW      = total > 0 ? Math.round(covCount  / total * 100) : 0;
+  const parW      = total > 0 ? Math.round(parCount  / total * 100) : 0;
+  const misW      = total > 0 ? Math.round(misCount  / total * 100) : 0;
+
+  const VERDICT_COLOUR = verdict === 'ACCEPTABLE' ? '#16a34a' : verdict === 'NEEDS NEGOTIATION' ? '#d97706' : '#dc2626';
+  const VERDICT_BG     = verdict === 'ACCEPTABLE' ? '#f0fdf4' : verdict === 'NEEDS NEGOTIATION' ? '#fffbeb' : '#fef2f2';
+  const reason = verdictReason(allResults);
+  const VERDICT_DESC =
+    reason === 'acceptable'
+      ? 'This contract meets the minimum PPM compliance threshold (≥80% coverage, no HIGH severity gaps). Review any PARTIAL items before finalising.'
+    : reason === 'needs_negotiation'
+      ? `This contract has ${covPct}% coverage, below the 80% acceptable threshold. Coverage gaps must be addressed before acceptance — negotiate the highlighted PARTIAL and MISSING items.`
+    : reason === 'high_missing'
+      ? `This contract leaves ${highMiss.length} HIGH severity task${highMiss.length > 1 ? 's' : ''} completely unevidenced. These are mandatory compliance items that must be explicitly covered before this contract can be accepted.`
+    : /* low_coverage */
+      `This contract covers only ${covPct}% of required maintenance tasks — below the minimum 60% threshold. Overall scope is insufficient and must be significantly expanded before acceptance.`;
+
+  const statusIcon = s => s === 'COVERED' ? '✅' : s === 'PARTIAL' ? '⚠️' : '❌';
+  const statusCol  = s => s === 'COVERED' ? '#16a34a' : s === 'PARTIAL' ? '#d97706' : '#dc2626';
+  const statusBg   = s => s === 'COVERED' ? '#f0fdf4' : s === 'PARTIAL' ? '#fffbeb' : '#fef2f2';
+  const freqIcon   = s => s === 'COMPLIANT' ? '✅' : s === 'NON_COMPLIANT' ? '❌' : '—';
+
+  // Build frequency summary table rows
+  const freqReqs = {};
+  for (const r of allResults) {
+    if (r.required_freq && r.required_freq !== '?') {
+      if (!freqReqs[r.required_freq]) freqReqs[r.required_freq] = { label: r.required_freq, compliant: 0, nonCompliant: 0, unknown: 0 };
+      if      (r.freq_status === 'COMPLIANT')     freqReqs[r.required_freq].compliant++;
+      else if (r.freq_status === 'NON_COMPLIANT') freqReqs[r.required_freq].nonCompliant++;
+      else                                         freqReqs[r.required_freq].unknown++;
+    }
+  }
+  const freqTableRows = Object.values(freqReqs).map(f => `
+    <tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600">${escHtml(f.label)}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#16a34a;text-align:center">${f.compliant > 0 ? '✅ ' + f.compliant + ' tasks' : '—'}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#dc2626;text-align:center">${f.nonCompliant > 0 ? '❌ ' + f.nonCompliant + ' tasks' : '—'}</td>
+    </tr>`).join('');
+
+  // Build schedule sections
+  const grouped = groupByRef(allResults);
+  const scheduleSections = Object.entries(grouped).map(([ref, tasks]) => {
+    const src        = tasks[0].source;
+    const title      = tasks[0].schedule_title;
+    const sCov       = tasks.filter(t => effectiveStatus(t) === 'COVERED').length;
+    const sPar       = tasks.filter(t => effectiveStatus(t) === 'PARTIAL').length;
+    const sMis       = tasks.filter(t => effectiveStatus(t) === 'MISSING').length;
+    const sHasCrit   = tasks.some(t => t.criticality_norm === 'HIGH' && effectiveStatus(t) === 'MISSING');
+    const headerBg   = sHasCrit ? '#fef2f2' : '#f8fafc';
+    const headerBdr  = sHasCrit ? '#fca5a5' : '#e2e8f0';
+    const taskRows   = tasks.map(t => {
+      const eff = effectiveStatus(t);
+      const evidenceRow = t.evidence && t.evidence.length > 0 ? `
+        <tr style="background:#f0f7ff">
+          <td colspan="8" style="padding:0;border-bottom:1px solid #dde8f0">
+            <details style="margin:0">
+              <summary style="padding:4px 10px 4px 34px;cursor:pointer;color:#1a6b8a;font-size:10px;user-select:none">evidence (${t.evidence.length} clause${t.evidence.length > 1 ? 's' : ''})</summary>
+              <div style="padding:6px 14px 10px">
+                ${t.evidence.map(e => `<div style="font-size:11px;color:#333;line-height:1.6;margin-bottom:4px;padding:4px 8px;background:white;border-radius:4px;border-left:3px solid #1a6b8a">${highlightEvidence(e.text, e.matchedTokens)}</div>`).join('')}
+              </div>
+            </details>
+          </td>
+        </tr>` : '';
+      return `<tr style="background:${statusBg(eff)}">
+        <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#64748b;white-space:nowrap">${escHtml(t.task_id)}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:13px">${escHtml(t.title)}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;text-align:center;font-size:12px;font-weight:700;color:${statusCol(eff)}">${eff}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;text-align:center;font-size:12px">${escHtml(t.confidence)}%</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;text-align:center;font-size:11px;color:${t.criticality_norm==='HIGH'?'#dc2626':'#64748b'};font-weight:${t.criticality_norm==='HIGH'?'700':'400'}">${escHtml(t.criticality_norm)||'—'}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;text-align:center;font-size:11px">${escHtml(t.required_freq)||'—'}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;text-align:center;font-size:11px">${freqIcon(t.freq_status)}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;text-align:center;font-size:11px;color:#64748b">${escHtml(t.skill_required)||'—'}</td>
+      </tr>${evidenceRow}`;
+    }).join('');
+    return `
+    <div style="margin-bottom:20px;border:1px solid ${headerBdr};border-radius:10px;overflow:hidden;page-break-inside:avoid">
+      <div style="background:${headerBg};border-bottom:1px solid ${headerBdr};padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <span style="font-weight:700;font-size:14px">${escHtml(ref)}</span>
+          <span style="color:#64748b;font-size:13px;margin-left:8px">${escHtml(title)}</span>
+          <span style="font-size:11px;color:#94a3b8;margin-left:6px">(${escHtml(src)})</span>
+        </div>
+        <div style="display:flex;gap:8px;font-size:12px;font-weight:600">
+          ${sCov ? `<span style="background:#dcfce7;color:#16a34a;padding:3px 8px;border-radius:12px">✅ ${sCov} covered</span>` : ''}
+          ${sPar ? `<span style="background:#fef9c3;color:#d97706;padding:3px 8px;border-radius:12px">⚠️ ${sPar} partial</span>` : ''}
+          ${sMis ? `<span style="background:#fee2e2;color:#dc2626;padding:3px 8px;border-radius:12px">❌ ${sMis} missing</span>` : ''}
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-family:system-ui,sans-serif">
+          <thead>
+            <tr style="background:#f1f5f9;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.04em">
+              <th style="padding:8px 10px;text-align:left;font-weight:600">Task ID</th>
+              <th style="padding:8px 10px;text-align:left;font-weight:600">Task</th>
+              <th style="padding:8px 10px;text-align:center;font-weight:600">Status</th>
+              <th style="padding:8px 10px;text-align:center;font-weight:600">Confidence</th>
+              <th style="padding:8px 10px;text-align:center;font-weight:600">Criticality</th>
+              <th style="padding:8px 10px;text-align:center;font-weight:600">Freq</th>
+              <th style="padding:8px 10px;text-align:center;font-weight:600">Freq OK</th>
+              <th style="padding:8px 10px;text-align:center;font-weight:600">Skill</th>
+            </tr>
+          </thead>
+          <tbody>${taskRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Critical gaps panel
+  const critGapsHtml = highMiss.length > 0 ? `
+    <div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:20px;margin-bottom:24px;page-break-inside:avoid">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <span style="font-size:22px">🚨</span>
+        <h2 style="margin:0;font-size:18px;color:#dc2626">Critical Gaps — ${highMiss.length} HIGH Severity Task${highMiss.length>1?'s':''} Missing</h2>
+      </div>
+      <p style="margin:0 0 14px;color:#7f1d1d;font-size:14px">These tasks are mandatory for compliance. The contract must explicitly cover each item before acceptance.</p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:#fee2e2">
+            <th style="padding:8px 10px;text-align:left;color:#991b1b">Task ID</th>
+            <th style="padding:8px 10px;text-align:left;color:#991b1b">Description</th>
+            <th style="padding:8px 10px;text-align:center;color:#991b1b">Frequency</th>
+            <th style="padding:8px 10px;text-align:center;color:#991b1b">Skill Required</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${highMiss.map(r => `<tr style="border-bottom:1px solid #fecaca">
+            <td style="padding:8px 10px;font-weight:700;color:#dc2626;white-space:nowrap">${escHtml(r.task_id)}</td>
+            <td style="padding:8px 10px">${escHtml(r.title)}</td>
+            <td style="padding:8px 10px;text-align:center;font-weight:600">${escHtml(r.required_freq)||'?'}</td>
+            <td style="padding:8px 10px;text-align:center">${escHtml(r.skill_required)||'?'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : `
+    <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:10px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;gap:12px">
+      <span style="font-size:24px">✅</span>
+      <div><strong style="color:#16a34a">No critical gaps detected.</strong><br><span style="color:#166534;font-size:13px">All HIGH severity tasks are either covered or partially covered.</span></div>
+    </div>`;
+
+  const dateStr = new Date().toLocaleDateString('en-IE', { day:'2-digit', month:'long', year:'numeric' });
+  const timeStr = new Date().toLocaleTimeString('en-IE', { hour:'2-digit', minute:'2-digit' });
+  const qRef    = getQuoteRef();
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PPM Compliance Report — ${escHtml(sysLabel)}${qRef ? ' — ' + escHtml(qRef) : ''} — ${dateStr}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; }
+  .page { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+  .print-btn { position: fixed; top: 16px; right: 16px; background: #1e40af; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+  .print-btn:hover { background: #1e3a8a; }
+  mark { background:#fff3cd; color:#333; padding:0 2px; border-radius:2px; }
+  @media print {
+    .print-btn { display: none !important; }
+    body { background: white; }
+    .page { padding: 0; max-width: none; }
+    details { open: true; }
+  }
+</style>
+</head>
+<body>
+<button class="print-btn" onclick="window.print()">🖨 Print / Save as PDF</button>
+<div class="page">
+
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:4px">PPM Compliance Check</div>
+      <h1 style="font-size:26px;font-weight:800;color:#0f172a">${escHtml(sysLabel)}</h1>
+      ${qRef ? `<div style="font-size:13px;font-weight:600;color:#4f46e5;margin-top:3px">${escHtml(qRef)}</div>` : ''}
+      <div style="font-size:13px;color:#64748b;margin-top:4px">Generated ${dateStr} at ${timeStr}</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Overall Verdict</div>
+      <div style="background:${VERDICT_COLOUR};color:white;font-size:16px;font-weight:800;padding:10px 22px;border-radius:10px;letter-spacing:.03em">${escHtml(verdict)}</div>
+    </div>
+  </div>
+
+  <!-- Verdict banner -->
+  <div style="background:${VERDICT_BG};border-left:5px solid ${VERDICT_COLOUR};border-radius:0 10px 10px 0;padding:14px 18px;margin-bottom:24px">
+    <p style="color:${VERDICT_COLOUR};font-weight:600;font-size:14px">${escHtml(VERDICT_DESC)}</p>
+  </div>
+
+  <!-- Dashboard panel -->
+  <div style="background:white;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:24px;overflow:hidden;display:flex;flex-wrap:wrap">
+    <!-- Donut -->
+    <div style="display:flex;align-items:center;justify-content:center;padding:20px 18px;border-right:1px solid #f1f5f9;flex-shrink:0">
+      <svg id="rptDonut" viewBox="0 0 120 120" width="110" height="110" role="img" aria-label="Coverage donut chart">
+        <circle cx="60" cy="60" r="48" fill="none" stroke="#f1f5f9" stroke-width="15"/>
+        <circle cx="60" cy="60" r="48" fill="none" stroke="#ef4444" stroke-width="15" transform="rotate(-90 60 60)" stroke-dasharray="0 302" id="rptMissing"/>
+        <circle cx="60" cy="60" r="48" fill="none" stroke="#f59e0b" stroke-width="15" transform="rotate(-90 60 60)" stroke-dasharray="0 302" id="rptPartial"/>
+        <circle cx="60" cy="60" r="48" fill="none" stroke="#22c55e" stroke-width="15" transform="rotate(-90 60 60)" stroke-dasharray="0 302" id="rptCovered"/>
+        <text x="60" y="57" text-anchor="middle" font-size="21" font-weight="800" fill="#0f172a" font-family="system-ui,sans-serif" id="rptPct">—</text>
+        <text x="60" y="73" text-anchor="middle" font-size="8.5" fill="#94a3b8" font-family="system-ui,sans-serif" letter-spacing="1">COVERAGE</text>
+      </svg>
+    </div>
+    <!-- KPI cards -->
+    <div style="display:flex;border-right:1px solid #f1f5f9;flex-shrink:0">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 18px;text-align:center;min-width:84px">
+        <div style="font-size:28px;font-weight:800;color:#0f172a">${total}</div>
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#94a3b8;margin-top:5px;font-weight:700">Tasks</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 18px;text-align:center;min-width:84px;border-left:1px solid #f1f5f9">
+        <div style="font-size:28px;font-weight:800;color:#16a34a">${covCount + parCount}</div>
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#94a3b8;margin-top:5px;font-weight:700">Covered</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 18px;text-align:center;min-width:84px;border-left:1px solid #f1f5f9">
+        <div style="font-size:28px;font-weight:800;color:${highMiss.length>0?'#dc2626':'#16a34a'}">${highMiss.length}</div>
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#94a3b8;margin-top:5px;font-weight:700">HIGH gaps</div>
+      </div>
+    </div>
+    <!-- Detail col -->
+    <div style="flex:1;padding:16px 20px;display:flex;flex-direction:column;gap:9px;justify-content:center;min-width:200px">
+      <!-- Stacked bar -->
+      <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:#f1f5f9" id="rptBar">
+        <div style="width:0%;background:#22c55e;height:100%;transition:width .9s cubic-bezier(.4,0,.2,1)" id="rptBCov"></div>
+        <div style="width:0%;background:#f59e0b;height:100%;transition:width .9s cubic-bezier(.4,0,.2,1)" id="rptBPar"></div>
+        <div style="width:0%;background:#ef4444;height:100%;transition:width .9s cubic-bezier(.4,0,.2,1)" id="rptBMis"></div>
+      </div>
+      <!-- Legend -->
+      <div style="display:flex;gap:14px;font-size:11px;color:#64748b;flex-wrap:wrap">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:3px;vertical-align:middle"></span><b>${covCount}</b> covered</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:3px;vertical-align:middle"></span><b>${parCount}</b> partial</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:3px;vertical-align:middle"></span><b>${misCount}</b> missing</span>
+      </div>
+      <!-- Criticality breakdown -->
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${['HIGH','MEDIUM','LOW'].map(k => {
+          const grp = allResults.filter(r => r.criticality_norm === k);
+          if (!grp.length) return '';
+          const cov = grp.filter(r => effectiveStatus(r) !== 'MISSING').length;
+          const pct = Math.round(cov / grp.length * 100);
+          const col = k === 'HIGH' ? '#dc2626' : k === 'MEDIUM' ? '#d97706' : '#16a34a';
+          return `<div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9.5px;font-weight:700;text-transform:uppercase;color:${col};width:48px;text-align:right;flex-shrink:0">${k}</span>
+            <div style="flex:1;height:7px;border-radius:4px;overflow:hidden;background:#f1f5f9">
+              <div style="width:${pct}%;height:100%;background:${col};border-radius:4px"></div>
+            </div>
+            <span style="font-size:10px;color:#94a3b8;width:30px;text-align:right">${cov}/${grp.length}</span>
+          </div>`;
+        }).join('')}
+      </div>
+      <!-- Freq chip -->
+      <div><span style="font-size:10px;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:2px 9px">🕐 ${escHtml(freqStr)}</span></div>
+    </div>
+  </div>
+  <script>
+  (function(){
+    var C=301.59, total=${total}, cov=${covCount}, par=${parCount}, mis=${misCount};
+    var covD=cov/total*C, parD=par/total*C, misD=mis/total*C;
+    function anim(){
+      var rc=document.getElementById('rptCovered'),rp=document.getElementById('rptPartial'),rm=document.getElementById('rptMissing');
+      [rc,rp,rm].forEach(function(e){if(e)e.style.transition='none';});
+      if(rc){rc.style['stroke-dashoffset']='0';rc.style['stroke-dasharray']='0 '+C;}
+      if(rp){rp.style['stroke-dashoffset']=-covD;rp.style['stroke-dasharray']='0 '+C;}
+      if(rm){rm.style['stroke-dashoffset']=-(covD+parD);rm.style['stroke-dasharray']='0 '+C;}
+      setTimeout(function(){
+        var t='stroke-dasharray 0.9s cubic-bezier(.4,0,.2,1)';
+        [rc,rp,rm].forEach(function(e){if(e)e.style.transition=t;});
+        if(rc)rc.style['stroke-dasharray']=covD+' '+C;
+        if(rp)rp.style['stroke-dasharray']=parD+' '+C;
+        if(rm)rm.style['stroke-dasharray']=misD+' '+C;
+        var pt=document.getElementById('rptPct');if(pt)pt.textContent=Math.round((cov+par)/total*100)+'%';
+        setTimeout(function(){
+          var p=function(n){return(n/total*100).toFixed(1)+'%';};
+          var bc=document.getElementById('rptBCov'),bp=document.getElementById('rptBPar'),bm=document.getElementById('rptBMis');
+          if(bc)bc.style.width=p(cov);if(bp)bp.style.width=p(par);if(bm)bm.style.width=p(mis);
+        },60);
+      },40);
+    }
+    if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',anim);}else{anim();}
+  })();
+  <\/script>
+
+  <!-- Critical gaps -->
+  ${critGapsHtml}
+
+  <!-- Frequency compliance -->
+  ${Object.keys(freqReqs).length > 0 ? `
+  <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:18px 20px;margin-bottom:24px;page-break-inside:avoid">
+    <h2 style="font-size:15px;font-weight:700;margin-bottom:12px;color:#0f172a">Frequency Compliance</h2>
+    <p style="font-size:13px;color:#64748b;margin-bottom:14px">Contract detected: <strong>${escHtml(freqStr)}</strong></p>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:#f1f5f9;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.04em">
+          <th style="padding:8px 12px;text-align:left;font-weight:600">Frequency Required</th>
+          <th style="padding:8px 12px;text-align:center;font-weight:600">Compliant Tasks</th>
+          <th style="padding:8px 12px;text-align:center;font-weight:600">Non-Compliant Tasks</th>
+        </tr>
+      </thead>
+      <tbody>${freqTableRows}</tbody>
+    </table>
+  </div>` : ''}
+
+  <!-- Schedule breakdown -->
+  <div style="margin-bottom:24px">
+    <h2 style="font-size:15px;font-weight:700;margin-bottom:14px;color:#0f172a">Schedule Breakdown</h2>
+    ${scheduleSections}
+  </div>
+
+  <!-- Footer -->
+  <div style="border-top:1px solid #e2e8f0;padding-top:16px;font-size:11px;color:#94a3b8;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <span>PPM Compliance Checker</span>
+    <span>Rule-based engine · SFG20 + HTM 06 · Generated ${dateStr}</span>
+  </div>
+
+</div>
+</body>
+</html>`;
+
+  downloadFile(`${exportFileSlug()}.html`, html, 'text/html');
+}
+
+function groupByRef(results) {
+  const out = {};
+  for (const r of results) {
+    if (!out[r.schedule_ref]) out[r.schedule_ref] = [];
+    out[r.schedule_ref].push(r);
+  }
+  return out;
+}
+
+// ─── Utility ──────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  if (s == null) return '—';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) { return escHtml(s); }
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
