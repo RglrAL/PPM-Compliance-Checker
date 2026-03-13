@@ -846,7 +846,7 @@
       <input type="file" id="fileInput" accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,text/plain" aria-label="Upload contract text file" tabindex="-1">
       <div class="dz-icon" id="dzIcon">📄</div>
       <div class="dz-label" id="dzLabel">Drop file here or click to browse</div>
-      <div class="dz-sub">.pdf · .docx · .txt</div>
+      <div class="dz-sub">.pdf · .txt (offline)&nbsp;&nbsp;·&nbsp;&nbsp;.docx (needs serve.py)</div>
       <div class="dz-filename" id="dzFilename"></div>
     </div>
     <div id="uploadLoading" class="upload-loading">⏳ Extracting text…</div>
@@ -1200,7 +1200,7 @@ let llmStatus = { available: false, model: null, embed_model: null };
 
 async function checkLlmAvailability() {
   try {
-    const r = await ('/llm_status');
+    const r = await fetch('/llm_status');
     llmStatus = await r.json();
   } catch { llmStatus = { available: false }; }
 
@@ -1363,7 +1363,7 @@ async function runSemanticReview() {
     let ok = false;
     let chunkUpgrades = 0;
     try {
-      const resp = await ('/llm_check_batch', {
+      const resp = await fetch('/llm_check_batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1768,6 +1768,65 @@ function setUploadLoading(on) {
   document.getElementById('uploadLoading').style.display = on ? 'block' : 'none';
 }
 
+// ─── PDF.js client-side extraction (no server needed) ────────────────────────
+const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+async function loadPdfJs() {
+  if (window.pdfjsLib) return;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = PDFJS_CDN;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Could not load PDF.js from CDN — check your internet connection'));
+    document.head.appendChild(s);
+  });
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+}
+
+async function extractPdfClientSide(file) {
+  await loadPdfJs();
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+
+  const pageTexts = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page    = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    // Reconstruct lines using y-position changes and hasEOL markers
+    const lines = [];
+    let line = '', prevY = null;
+    for (const item of content.items) {
+      if (typeof item.str !== 'string') continue;
+      const y = item.transform[5];
+      if (prevY !== null && Math.abs(y - prevY) > 4) {
+        if (line.trim()) lines.push(line.trim());
+        line = '';
+      }
+      line += item.str;
+      if (item.hasEOL) {
+        if (line.trim()) lines.push(line.trim());
+        line = '';
+        prevY = null;
+        continue;
+      }
+      prevY = y;
+    }
+    if (line.trim()) lines.push(line.trim());
+    pageTexts.push(lines.join('\n'));
+  }
+  return pageTexts.join('\n\n');
+}
+
+// ─── Shared post-load helper ──────────────────────────────────────────────────
+function applyExtractedText(text, filename) {
+  document.getElementById('contractText').value = text;
+  document.getElementById('quoteRefInput').dataset.userEdited = '';
+  checkRunReady();
+  autoExtractQuoteRef();
+  setUploadStatus('Loaded: ' + filename);
+}
+
 async function handleFileUpload(file) {
   const existing = document.getElementById('contractText').value.trim();
   if (existing.length > 10 && !confirm('Replace existing contract text with uploaded file?')) {
@@ -1778,17 +1837,11 @@ async function handleFileUpload(file) {
   setUploadStatus('');
   const ext = file.name.split('.').pop().toLowerCase();
 
+  // .txt — always works in-browser, no server needed
   if (ext === 'txt') {
     return new Promise(resolve => {
       const reader = new FileReader();
-      reader.onload = e => {
-        document.getElementById('contractText').value = e.target.result;
-        setUploadStatus('Loaded: ' + file.name);
-        document.getElementById('quoteRefInput').dataset.userEdited = '';
-        checkRunReady();
-        autoExtractQuoteRef();
-        resolve();
-      };
+      reader.onload = e => { applyExtractedText(e.target.result, file.name); resolve(); };
       reader.readAsText(file);
     });
   }
@@ -1800,23 +1853,33 @@ async function handleFileUpload(file) {
 
   setUploadLoading(true);
   try {
+    // Try server first (pdfplumber gives better results for complex layouts)
     const resp = await fetch(`/extract?name=${encodeURIComponent(file.name)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream' },
       body: file,
     });
     const json = await resp.json();
-    if (!resp.ok) {
-      setUploadStatus(json.error || 'Server error', true);
-      return;
+    if (!resp.ok) throw new Error(json.error || 'Server error');
+    applyExtractedText(json.text, file.name);
+
+  } catch (serverErr) {
+    // Server unavailable (GitHub Pages, serve.py not running, etc.)
+    if (ext === 'pdf') {
+      // Fallback: extract in-browser with PDF.js
+      setUploadStatus('Server unavailable — extracting PDF in browser…');
+      try {
+        const text = await extractPdfClientSide(file);
+        if (!text.trim()) throw new Error('No text found — the PDF may be image-only (scanned)');
+        applyExtractedText(text, file.name);
+        setUploadStatus('Loaded (browser extraction): ' + file.name);
+      } catch (pdfErr) {
+        setUploadStatus('PDF extraction failed: ' + pdfErr.message, true);
+      }
+    } else {
+      // .docx requires server — no browser fallback available
+      setUploadStatus('.docx extraction requires serve.py — paste text manually, or convert to .txt first', true);
     }
-    document.getElementById('contractText').value = json.text;
-    setUploadStatus('Loaded: ' + file.name);
-    document.getElementById('quoteRefInput').dataset.userEdited = '';
-    checkRunReady();
-    autoExtractQuoteRef();
-  } catch (e) {
-    setUploadStatus('Could not reach server — is serve.py running?', true);
   } finally {
     setUploadLoading(false);
   }
