@@ -1693,6 +1693,7 @@ function selectSystem(value) {
   });
   updateRefBox();
   checkRunReady();
+  setTimeout(() => document.getElementById('dropZone').scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
 }
 
 // ─── UI helpers ───────────────────────────────────────────────────────────────
@@ -1708,15 +1709,9 @@ function updateRefBox() {
 }
 
 function checkRunReady() {
-  const sys    = document.getElementById('systemSelect').value;
-  const text   = document.getElementById('contractText').value.trim();
-  const btn    = document.getElementById('runBtn');
-  const wasOff = btn.disabled;
-  btn.disabled = !(sys && text.length > 10 && Object.keys(tasksByRef).length > 0);
-  // Scroll to the Run button the first time it becomes enabled
-  if (wasOff && !btn.disabled) {
-    setTimeout(() => btn.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
-  }
+  const sys  = document.getElementById('systemSelect').value;
+  const text = document.getElementById('contractText').value.trim();
+  document.getElementById('runBtn').disabled = !(sys && text.length > 10 && Object.keys(tasksByRef).length > 0);
 }
 
 document.getElementById('systemSelect').addEventListener('change', () => {
@@ -1836,6 +1831,7 @@ function applyExtractedText(text, filename) {
   checkRunReady();
   autoExtractQuoteRef();
   setUploadStatus('Loaded: ' + filename);
+  setTimeout(() => document.getElementById('runBtn').scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
 }
 
 async function handleFileUpload(file) {
