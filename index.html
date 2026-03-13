@@ -1482,6 +1482,7 @@ function acceptLlmSuggestion(taskId, status, btn) {
   refreshSectionHeader(tr.closest('.schedule-section'));
   refreshSummary();
   applyFilter();
+  scrollToSummaryIfHidden();
 
   // D — pulse the Covered KPI card to signal the change
   const covEl = document.getElementById('kpiCovered');
@@ -2348,6 +2349,7 @@ function renderResults(sysKey, freqHits, contractFreqDays) {
 
   document.getElementById('results').style.display = '';
   animateDashboard();
+  setTimeout(scrollToSummary, 80);
 }
 
 function buildScheduleSection(ref, tasks) {
@@ -2547,6 +2549,20 @@ function applyOverride(sel) {
   refreshSectionHeader(tr.closest('.schedule-section'));
   refreshSummary();
   applyFilter();
+  scrollToSummaryIfHidden();
+}
+
+function scrollToSummary() {
+  const el = document.getElementById('summaryBar');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function scrollToSummaryIfHidden() {
+  const el = document.getElementById('summaryBar');
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  const inView = rect.top >= 0 && rect.bottom <= window.innerHeight;
+  if (!inView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function refreshSummary() {
@@ -2611,6 +2627,7 @@ function renderResults(sysKey, freqHits, contractFreqDays) {
   document.getElementById('results').style.display = '';
   checkLlmAvailability();
   animateDashboard();
+  setTimeout(scrollToSummary, 80);
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
