@@ -59,7 +59,31 @@
               text-transform: uppercase; letter-spacing: .04em; transition: color .18s; }
   .sys-tile.active .sys-name { color: rgba(255,255,255,.92); }
   .ref-box { font-size: 11px; color: #64748b; line-height: 1.8; background: #f8fafc; border-radius: 8px; padding: 10px 12px; border: 1px solid #e2e8f0; }
-  .ref-box .ref-title { color: #1a3a5c; font-weight: 700; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .08em; font-size: 9px; }
+  .ref-box .ref-title { color: #1a3a5c; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .08em; font-size: 9px; }
+  .ref-sched { border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 5px; overflow: hidden; }
+  .ref-sched-hdr { display: flex; align-items: center; gap: 6px; padding: 6px 9px; cursor: pointer; background: white; user-select: none; }
+  .ref-sched-hdr:hover { background: #f1f5f9; }
+  .ref-sched-arrow { font-size: 9px; color: #94a3b8; transition: transform .18s; flex-shrink: 0; }
+  .ref-sched.open .ref-sched-arrow { transform: rotate(90deg); }
+  .ref-sched-code { font-weight: 700; color: #1a3a5c; font-size: 10px; flex-shrink: 0; }
+  .ref-sched-name { color: #475569; font-size: 10px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ref-sched-pills { display: flex; gap: 3px; flex-shrink: 0; }
+  .ref-pill { font-size: 9px; padding: 1px 5px; border-radius: 8px; font-weight: 600; }
+  .ref-pill-src  { background: #dbeafe; color: #1e40af; }
+  .ref-pill-high { background: #fee2e2; color: #b91c1c; }
+  .ref-pill-safe { background: #fef3c7; color: #92400e; }
+  .ref-pill-cnt  { background: #f1f5f9; color: #475569; }
+  .ref-sched-body { display: none; border-top: 1px solid #e2e8f0; padding: 6px 9px; background: #fafbfc; }
+  .ref-sched.open .ref-sched-body { display: block; }
+  .ref-task-row { display: flex; align-items: baseline; gap: 6px; padding: 2px 0; border-bottom: 1px solid #f1f5f9; font-size: 10px; }
+  .ref-task-row:last-child { border-bottom: none; }
+  .ref-task-title { flex: 1; color: #334155; }
+  .ref-task-freq  { color: #64748b; flex-shrink: 0; font-size: 9px; }
+  .ref-task-crit  { flex-shrink: 0; font-size: 9px; font-weight: 600; }
+  .ref-task-crit.HIGH   { color: #dc2626; }
+  .ref-task-crit.MEDIUM { color: #d97706; }
+  .ref-task-crit.LOW    { color: #64748b; }
+  .ref-task-safe { color: #b45309; font-size: 9px; flex-shrink: 0; }
 
   /* ── Contract editor ── */
   .textarea-wrap { position: relative; }
@@ -505,6 +529,14 @@
   html.dark .sys-name           { color:#cbd5e1; }
   html.dark .ref-box            { background:#1e2a3a; border-color:#2d3748; color:#94a3b8; }
   html.dark .ref-box .ref-title { color:#93c5fd; }
+  html.dark .ref-sched          { border-color:#2d3748; }
+  html.dark .ref-sched-hdr      { background:#1e2a3a; }
+  html.dark .ref-sched-hdr:hover{ background:#243040; }
+  html.dark .ref-sched-code     { color:#93c5fd; }
+  html.dark .ref-sched-name     { color:#94a3b8; }
+  html.dark .ref-sched-body     { background:#18222f; border-color:#2d3748; }
+  html.dark .ref-task-row       { border-color:#2d3748; }
+  html.dark .ref-task-title     { color:#cbd5e1; }
 
   /* ── Inputs ── */
   html.dark select              { background:#1e2a3a; border-color:#374151; color:#e2e8f0; }
@@ -1699,13 +1731,64 @@ function selectSystem(value) {
 // ─── UI helpers ───────────────────────────────────────────────────────────────
 function updateRefBox() {
   const sys = document.getElementById('systemSelect').value;
-  const el = document.getElementById('refList');
-  if (!sys || !SYSTEM_REFS[sys]) { el.textContent = 'Select a system to see applicable schedules.'; return; }
-  const refs = SYSTEM_REFS[sys];
+  const el  = document.getElementById('refList');
+  if (!sys || !SYSTEM_REFS[sys]) {
+    el.innerHTML = '<span style="color:#94a3b8">Select a system to see applicable schedules.</span>';
+    return;
+  }
+  const refs    = SYSTEM_REFS[sys];
+  const allRefs = [...refs.htm06, ...refs.sfg20];
+  if (!allRefs.length) { el.innerHTML = 'No schedules mapped.'; return; }
+
+  const FREQ_LABEL = { '1M':'Monthly','3M':'3-Monthly','6M':'6-Monthly',
+    '12M':'Annual','24M':'2-Yearly','0U':'On-demand' };
+
   let html = '';
-  if (refs.htm06.length) html += `<b>HTM 06:</b> ${refs.htm06.join(', ')}<br>`;
-  if (refs.sfg20.length) html += `<b>SFG20:</b> ${refs.sfg20.join(', ')}`;
-  el.innerHTML = html || 'No schedules mapped.';
+  for (const ref of allRefs) {
+    const tasks   = tasksByRef[ref] || [];
+    const first   = tasks[0] || {};
+    const title   = first.schedule_title || ref;
+    const src     = first.source || (ref.startsWith('HTM') ? 'HTM 06' : 'SFG20');
+    const nHigh   = tasks.filter(t => t.criticality_norm === 'HIGH').length;
+    const nSafe   = tasks.filter(t => t.safety_flag).length;
+    const srcCol  = src.includes('HTM') ? '#dbeafe' : '#ede9fe';
+    const srcTxt  = src.includes('HTM') ? '#1e40af' : '#5b21b6';
+
+    const pills = `
+      <span class="ref-pill ref-pill-src" style="background:${srcCol};color:${srcTxt}">${src}</span>
+      <span class="ref-pill ref-pill-cnt">${tasks.length} tasks</span>
+      ${nHigh  ? `<span class="ref-pill ref-pill-high">⚑ ${nHigh} high</span>` : ''}
+      ${nSafe  ? `<span class="ref-pill ref-pill-safe">⚠ ${nSafe} safety</span>` : ''}
+    `;
+
+    const taskRows = tasks.map(t => {
+      const freq  = FREQ_LABEL[t.frequency] || t.frequency || '—';
+      const crit  = t.criticality_norm || 'LOW';
+      const safe  = t.safety_flag ? '<span class="ref-task-safe">⚠</span>' : '';
+      return `<div class="ref-task-row">
+        <span class="ref-task-title">${escHtml(t.title)}</span>
+        <span class="ref-task-freq">${escHtml(freq)}</span>
+        <span class="ref-task-crit ${crit}">${crit}</span>
+        ${safe}
+      </div>`;
+    }).join('');
+
+    html += `
+      <div class="ref-sched" id="refsched-${escAttr(ref)}">
+        <div class="ref-sched-hdr" onclick="toggleRefSched('${escAttr(ref)}')">
+          <span class="ref-sched-arrow">▶</span>
+          <span class="ref-sched-code">${escHtml(ref)}</span>
+          <span class="ref-sched-name">${escHtml(title)}</span>
+          <span class="ref-sched-pills">${pills}</span>
+        </div>
+        <div class="ref-sched-body">${taskRows}</div>
+      </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function toggleRefSched(ref) {
+  document.getElementById('refsched-' + ref).classList.toggle('open');
 }
 
 function checkRunReady() {
