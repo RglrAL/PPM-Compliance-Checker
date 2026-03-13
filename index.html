@@ -1719,7 +1719,11 @@ function checkRunReady() {
   }
 }
 
-document.getElementById('systemSelect').addEventListener('change', () => { updateRefBox(); checkRunReady(); });
+document.getElementById('systemSelect').addEventListener('change', () => {
+  updateRefBox();
+  checkRunReady();
+  setTimeout(() => document.getElementById('dropZone').scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
+});
 document.getElementById('contractText').addEventListener('input', () => { checkRunReady(); autoExtractQuoteRef(); });
 
 function autoExtractQuoteRef() {
