@@ -1670,7 +1670,8 @@ function toggleEvidence(btn) {
 }
 
 // ─── LLM semantic review ──────────────────────────────────────────────────────
-let llmStatus = { available: false, model: null, embed_model: null };
+let llmStatus  = { available: false, model: null, embed_model: null };
+let _llmRunning = false;
 
 async function checkLlmAvailability() {
   try {
@@ -1690,6 +1691,8 @@ async function checkLlmAvailability() {
 }
 
 async function runSemanticReview(autoTrigger = false, targetCandidates = null) {
+  if (_llmRunning) return;
+  _llmRunning = true;
   const btn            = document.getElementById('llmRunBtn');
   const progressEl     = document.getElementById('llmProgress');
   const detailEl       = document.getElementById('llmProgressDetail');
@@ -1707,6 +1710,7 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null) {
   );
   if (candidates.length === 0) {
     if (!autoTrigger) progressEl.textContent = 'No MISSING/PARTIAL tasks to review.';
+    _llmRunning = false;
     return;
   }
 
@@ -1924,6 +1928,7 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null) {
   currentTaskEl.textContent = '';
   progressEl.textContent    = `Done — ${upgraded} change${upgraded !== 1 ? 's' : ''} applied from ${reviewed} tasks reviewed.`;
   btn.disabled = false;
+  _llmRunning = false;
   refreshSummary();
   applyFilter();
 }
@@ -3572,7 +3577,7 @@ function renderResults(sysKey, freqHits) {
         if (eff === 'COVERED' && r.confidence < 85) return true;
         return false;
       });
-      if (candidates.length > 0) runSemanticReview(true, candidates);
+      if (candidates.length > 0 && !_llmRunning) runSemanticReview(true, candidates);
     }
   });
 
