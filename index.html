@@ -536,8 +536,7 @@
   .llm-auto-bar { display:flex; align-items:baseline; gap:8px; font-size:11px;
                   padding:4px 16px; flex-wrap:wrap; }
   .llm-auto-verdict { font-weight:700; color:#1e40af; white-space:nowrap; }
-  .llm-auto-reason  { color:#475569; flex:1; min-width:0;
-                      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .llm-auto-reason  { color:#475569; flex:1; min-width:0; }
   .llm-revert-btn   { font-size:10.5px; padding:1px 8px; border-radius:4px; border:1px solid #cbd5e1;
                       background:white; cursor:pointer; color:#64748b; white-space:nowrap; flex-shrink:0; }
   .llm-revert-btn:hover { background:#f1f5f9; color:#0f172a; }
@@ -1025,16 +1024,16 @@
 
     <!-- LLM unavailability notice (shown when LLM is not available after a check) -->
     <div id="llmUnavailableNotice" class="llm-unavail-notice" style="display:none">
-      ⚠ Semantic review unavailable — running in keyword-only mode.
+      ⚠ AI review unavailable — running in keyword-only mode.
       <a href="https://ollama.com" target="_blank">Install Ollama</a> or place a GGUF model in the models/ folder for more reliable results.
     </div>
 
     <!-- LLM semantic review bar (hidden until Ollama detected) -->
     <div id="llmReviewBar" class="llm-review-bar" style="display:none">
       <div class="llm-bar-top">
-        <button id="llmRunBtn" class="llm-review-btn" onclick="runSemanticReview()">✦ Run semantic review</button>
+        <button id="llmRunBtn" class="llm-review-btn" onclick="runSemanticReview()">✦ Run AI review</button>
         <span class="llm-model-tag"></span>
-        <span class="llm-progress" id="llmProgress">Reviews MISSING &amp; PARTIAL tasks using local LLM</span>
+        <span class="llm-progress" id="llmProgress">Reviews MISSING &amp; PARTIAL tasks using AI</span>
       </div>
       <div id="llmProgressDetail" style="display:none">
         <div class="llm-pbar-track"><div id="llmPbarFill" class="llm-pbar-fill"></div></div>
@@ -1716,6 +1715,8 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null) {
 
   btn.disabled = true;
 
+  const statusRank = { 'MISSING': 0, 'PARTIAL': 1, 'COVERED': 2 };
+
   // Show progress UI and reset
   detailEl.style.display = '';
   taskLog.innerHTML      = '';
@@ -1780,10 +1781,11 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null) {
     pbarLabel.textContent = '✓ All cached';
     progressEl.textContent = `All ${candidates.length} tasks loaded from cache instantly.`;
     btn.disabled = false;
+    _llmRunning = false;
     return;
   }
 
-  const CHUNK        = 6;
+  const CHUNK        = 4;
   const totalChunks  = Math.ceil(uncached.length / CHUNK);
   progressEl.textContent = `Reviewing ${uncached.length} tasks in ${totalChunks} batch${totalChunks > 1 ? 'es' : ''}…`;
 
@@ -1827,7 +1829,6 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null) {
     pbarFill.style.width = snapToPct + '%';
   }
 
-  const statusRank = { 'MISSING': 0, 'PARTIAL': 1, 'COVERED': 2 };
   let upgraded = 0;
   let reviewed = 0;
 
@@ -1861,10 +1862,12 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tasks: chunk.map(r => ({
-            task_id:     r.task_id,
-            task_title:  r.title,
-            task_notes:  r.notes  || '',
-            task_action: (r.action || '').slice(0, 200),
+            task_id:            r.task_id,
+            task_title:         r.title,
+            task_notes:         r.notes  || '',
+            task_action:        (r.action || '').slice(0, 300),
+            required_freq:      r.required_freq || '',
+            evidence_sentences: (r.evidence || []).map(e => e.text),
           })),
           contract_text: contractText,
           model:         llmStatus.model,
@@ -1942,7 +1945,7 @@ function applyLlmSuggestion(taskId, status, reasoning, keySentences) {
   if (!tr.querySelector('.llm-badge')) {
     const badge = document.createElement('span');
     badge.className = 'llm-badge';
-    badge.textContent = `✦ LLM: ${status}`;
+    badge.textContent = `✦ AI: ${status}`;
     tr.cells[0].appendChild(badge);
   }
 
@@ -1962,7 +1965,7 @@ function applyLlmSuggestion(taskId, status, reasoning, keySentences) {
   const snippets = (keySentences || [])
     .map(s => `<div class="evidence-snippet">${escHtml(s)}</div>`).join('');
   llmRow.innerHTML = `<td colspan="9"><div class="llm-panel">
-    <div class="llm-reasoning">LLM suggests: <strong>${escHtml(status)}</strong> — ${escHtml(reasoning)}</div>
+    <div class="llm-reasoning">AI suggests: <strong>${escHtml(status)}</strong> — ${escHtml(reasoning)}</div>
     ${snippets}
     <button class="llm-accept-btn" onclick="acceptLlmSuggestion('${escAttr(taskId)}','${escAttr(status)}',this)">Accept suggestion</button>
     <button class="llm-dismiss-btn" onclick="this.closest('tr').remove();this.closest('tr')?.querySelector('.llm-badge')?.remove()">Dismiss</button>
@@ -1988,7 +1991,7 @@ function acceptLlmSuggestion(taskId, status, btn) {
   if (sel) sel.value = status;
 
   const badge = tr.querySelector('.llm-badge');
-  if (badge) { badge.textContent = `✦ LLM: ${eff} ✓`; badge.style.background = '#dcfce7'; badge.style.color = '#15803d'; }
+  if (badge) { badge.textContent = `✦ AI: ${eff} ✓`; badge.style.background = '#dcfce7'; badge.style.color = '#15803d'; }
 
   btn.closest('tr').remove();
   refreshSectionHeader(tr.closest('.schedule-section'));
@@ -2014,6 +2017,12 @@ function applyLlmAutoResult(taskId, status, reasoning, keySentences) {
   const tr = document.getElementById(safeId);
   if (!tr) return;
 
+  // Determine if upgrade or downgrade (needed for badge and bar colour)
+  const statusRankLocal = { 'MISSING': 0, 'PARTIAL': 1, 'COVERED': 2 };
+  const origResult  = allResults.find(r => r.task_id === taskId);
+  const origStatus  = origResult ? origResult.status : 'MISSING';
+  const isDowngrade = statusRankLocal[status] < statusRankLocal[origStatus];
+
   // Update row class and status cell
   tr.dataset.eff = status;
   tr.className   = `task-row row-${status.toLowerCase()}`;
@@ -2030,7 +2039,7 @@ function applyLlmAutoResult(taskId, status, reasoning, keySentences) {
     badge.className = 'llm-badge';
     tr.cells[0].appendChild(badge);
   }
-  badge.textContent = `✦ LLM: ${status}`;
+  badge.textContent = `✦ AI: ${status}${isDowngrade ? ` (was ${origStatus})` : ''}`;
 
   // Flash animation
   tr.classList.remove('llm-flash-upgrade');
@@ -2041,12 +2050,6 @@ function applyLlmAutoResult(taskId, status, reasoning, keySentences) {
   // Remove any existing llm-row or llm-auto-row sibling
   const next = tr.nextElementSibling;
   if (next && (next.classList.contains('llm-row') || next.classList.contains('llm-auto-row'))) next.remove();
-
-  // Determine if upgrade or downgrade for colour
-  const statusRankLocal = { 'MISSING': 0, 'PARTIAL': 1, 'COVERED': 2 };
-  const origResult = allResults.find(r => r.task_id === taskId);
-  const origStatus = origResult ? origResult.status : 'MISSING';
-  const isDowngrade = statusRankLocal[status] < statusRankLocal[origStatus];
   const barBg     = isDowngrade ? '#fffbeb' : '#f0fdf4';
   const barBorder = isDowngrade ? '#fde68a' : '#bbf7d0';
 
@@ -2056,7 +2059,7 @@ function applyLlmAutoResult(taskId, status, reasoning, keySentences) {
   const snippetText = (keySentences || []).slice(0, 1).map(s => escHtml(s)).join('');
   autoRow.innerHTML = `<td colspan="9" style="padding:0 !important; border-bottom:1px solid ${barBorder} !important;">
     <div class="llm-auto-bar" style="background:${barBg}; border-bottom:1px solid ${barBorder};">
-      <span class="llm-auto-verdict">✦ LLM: ${escHtml(status)}</span>
+      <span class="llm-auto-verdict">✦ AI: ${escHtml(status)}${isDowngrade ? ` (was ${escHtml(origStatus)})` : ''}</span>
       <span class="llm-auto-reason">${escHtml(reasoning)}${snippetText ? ' — ' + snippetText : ''}</span>
       <button class="llm-revert-btn" onclick="revertLlmResult('${escAttr(taskId)}')">✕ Revert</button>
     </div>
@@ -2286,7 +2289,7 @@ function inScopeResults() {
 }
 
 // ─── LLM result cache (localStorage) ─────────────────────────────────────────
-const LLM_CACHE_KEY = 'ppm_llm_cache_v10';
+const LLM_CACHE_KEY = 'ppm_llm_cache_v16';
 const LLM_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 function contractHash(text) {
@@ -3561,7 +3564,7 @@ function renderResults(sysKey, freqHits) {
 
   // Reset button state for new check
   const llmRunBtn = document.getElementById('llmRunBtn');
-  if (llmRunBtn) { llmRunBtn.textContent = '✦ Run semantic review'; llmRunBtn.disabled = false; }
+  if (llmRunBtn) { llmRunBtn.textContent = '✦ Run AI review'; llmRunBtn.disabled = false; }
 
   checkLlmAvailability().then(() => {
     const notice = document.getElementById('llmUnavailableNotice');
@@ -3573,6 +3576,8 @@ function renderResults(sysKey, freqHits) {
         if (r.scope_status === 'out_of_scope') return false;
         if (r._refCited) return false;
         const eff = effectiveStatus(r);
+        // MISSING with very low keyword confidence — nothing for LLM to work with
+        if (eff === 'MISSING' && r.confidence < 12) return false;
         if (eff === 'MISSING' || eff === 'PARTIAL') return true;
         if (eff === 'COVERED' && r.confidence < 85) return true;
         return false;
