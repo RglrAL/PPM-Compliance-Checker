@@ -282,6 +282,9 @@
   .gap-link:hover { color: #1a3a5c; text-decoration: underline; }
 
   /* ── Filters ── */
+  .tool-disclaimer { font-size:11px; color:#92400e; background:#fffbeb; border:1px solid #fcd34d;
+                     border-radius:8px; padding:8px 14px; margin-bottom:10px; line-height:1.5; }
+  html.dark .tool-disclaimer { background:#292524; border-color:#78350f; color:#fbbf24; }
   .filter-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
   .filter-input { flex: 1; min-width: 180px; padding: 8px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 12px; font-family: inherit; color: #334155; transition: border-color .15s; background: white; }
   .filter-input:focus { outline: none; border-color: #1a6b8a; box-shadow: 0 0 0 3px rgba(26,107,138,.1); }
@@ -934,6 +937,10 @@
 
   <!-- Results area -->
   <div id="results" style="display:none">
+    <div class="tool-disclaimer">
+      This tool surfaces gaps for human review — it does not replace professional assessment.
+      Scores reflect keyword matching against SFG20/HTM06 task titles and are indicative only.
+    </div>
     <div id="summaryBar" class="summary-bar"></div>
     <div id="criticalGaps" class="critical-gaps" style="display:none">
       <h3>⚠️ CRITICAL GAPS — HIGH criticality tasks not evidenced:</h3>
@@ -1156,9 +1163,10 @@ for (const [abbr, expansions] of Object.entries(SYNONYMS)) {
 
 // ─── Tokenisation ─────────────────────────────────────────────────────────────
 const STOP_WORDS = new Set([
-  'test','check','inspect','ensure','verify',
+  // Grammatical / structural words only — maintenance verbs (test, check, inspect etc.)
+  // are intentionally NOT stop words: they carry discriminating signal in contract text.
   'the','and','for','with','all','any','that','this','each','shall','must',
-  'perform','carry','where','should','using','upon','from','into',
+  'where','should','using','upon','from','into',
   'will','have','been','also','when','then','them','they','their',
 ]);
 
@@ -1654,16 +1662,36 @@ function contractFrequency(text) {
     .sort((a, b) => a.days - b.days);
 }
 
+// ─── Per-task frequency matching ──────────────────────────────────────────────
+// For a task requiring taskDays interval, find the most relevant contract frequency:
+// the longest interval that still meets the requirement (≤ taskDays). This avoids
+// applying a high-frequency schedule (e.g. weekly) to judge an annual task when
+// the contract also explicitly includes an annual clause.
+// freqHits is sorted ascending by days (most frequent first).
+function bestContractFreq(freqHits, taskDays) {
+  if (!taskDays || !freqHits.length) return null;
+  let best = null;
+  for (const f of freqHits) {
+    if (f.days <= taskDays) best = f; // keep updating — last qualifying = longest interval
+  }
+  return best; // null if no contract frequency meets this task's requirement
+}
+
 // ─── Assess a single task ─────────────────────────────────────────────────────
-function assessTask(task, contractIndex, contractFreqDays) {
+function assessTask(task, contractIndex, freqHits) {
   const score  = taskPresence(task, contractIndex);
-  const status = score >= 0.5 ? 'COVERED' : score >= 0.25 ? 'PARTIAL' : 'MISSING';
+  let   status = score >= 0.5 ? 'COVERED' : score >= 0.25 ? 'PARTIAL' : 'MISSING';
   let freqOk;
-  if (!task.frequency_days || !contractFreqDays) {
+  if (!task.frequency_days || !freqHits.length) {
     freqOk = 'UNKNOWN';
   } else {
-    freqOk = contractFreqDays <= task.frequency_days ? 'COMPLIANT' : 'NON_COMPLIANT';
+    const best = bestContractFreq(freqHits, task.frequency_days);
+    freqOk = best ? 'COMPLIANT' : 'NON_COMPLIANT';
   }
+  // Frequency cap: a task cannot be COVERED if the contract visits less frequently
+  // than required. UNKNOWN is not capped — absence of frequency language in the
+  // contract text does not imply a gap (frequency may be specified elsewhere).
+  if (freqOk === 'NON_COMPLIANT' && status === 'COVERED') status = 'PARTIAL';
   const evidence = gatherEvidence(task, status);
   return {
     task_id:          task.task_id,
@@ -2288,28 +2316,27 @@ function runCheck() {
 
   const contractIndex = buildIndex(contractText); // also sets contractFuzzyTokens
   const freqHits      = contractFrequency(contractText);
-  const contractFreqDays = freqHits.length ? freqHits[0].days : null;
 
   document.getElementById('progressWrap').style.display = '';
   document.getElementById('runBtn').disabled = true;
   allResults = [];
   sortState  = { col: null, dir: 'asc' };
 
-  runEngineAsync(systemTasks, contractIndex, contractFreqDays, results => {
+  runEngineAsync(systemTasks, contractIndex, freqHits, results => {
     allResults = results;
     document.getElementById('progressWrap').style.display = 'none';
     document.getElementById('runBtn').disabled = false;
-    renderResults(sysKey, freqHits, contractFreqDays);
+    renderResults(sysKey, freqHits);
   });
 }
 
-function runEngineAsync(tasks, contractIndex, contractFreqDays, onDone) {
+function runEngineAsync(tasks, contractIndex, freqHits, onDone) {
   const results = [];
   const BATCH   = 100;
   let i = 0;
   function step() {
     const end = Math.min(i + BATCH, tasks.length);
-    while (i < end) { results.push(assessTask(tasks[i], contractIndex, contractFreqDays)); i++; }
+    while (i < end) { results.push(assessTask(tasks[i], contractIndex, freqHits)); i++; }
     updateProgress(i, tasks.length);
     if (i < tasks.length) requestAnimationFrame(step);
     else onDone(results);
@@ -2502,7 +2529,7 @@ function animateDashboard() {
   }, 60);
 }
 
-function renderResults(sysKey, freqHits, contractFreqDays) {
+function renderResults(sysKey, freqHits) {
   const refs    = SYSTEM_REFS[sysKey];
   const allRefs = [...refs.sfg20, ...refs.htm06];
 
@@ -2783,7 +2810,7 @@ function refreshSummary() {
 // Patch renderResults to store freqHits on summaryBar for refreshSummary
 const _origRenderResults = renderResults;
 // Override renderResults to stash freqHits
-function renderResults(sysKey, freqHits, contractFreqDays) {
+function renderResults(sysKey, freqHits) {
   const refs    = SYSTEM_REFS[sysKey];
   const allRefs = [...refs.sfg20, ...refs.htm06];
 
