@@ -1785,7 +1785,7 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null) {
     return;
   }
 
-  const CHUNK        = 4;
+  const CHUNK        = 2;
   const totalChunks  = Math.ceil(uncached.length / CHUNK);
   progressEl.textContent = `Reviewing ${uncached.length} tasks in ${totalChunks} batch${totalChunks > 1 ? 'es' : ''}…`;
 
@@ -2289,7 +2289,7 @@ function inScopeResults() {
 }
 
 // ─── LLM result cache (localStorage) ─────────────────────────────────────────
-const LLM_CACHE_KEY = 'ppm_llm_cache_v16';
+const LLM_CACHE_KEY = 'ppm_llm_cache_v17';
 const LLM_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 function contractHash(text) {
