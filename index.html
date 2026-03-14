@@ -640,6 +640,21 @@
   html.dark .owner-btn.active     { background:#4f46e5; color:white; border-color:#4f46e5; }
   html.dark .owner-btn:hover:not(.active) { border-color:#94a3b8; background:#1a2f44; }
 
+  /* ── Ref scope (sub-type selection) ── */
+  .ref-scope-bar  { display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+  .ref-scope-btn  { padding:3px 10px; border-radius:5px; border:1px solid #e2e8f0;
+                    background:white; color:#475569; font-size:10px; font-weight:600;
+                    cursor:pointer; font-family:inherit; transition:background .12s; }
+  .ref-scope-btn:hover { background:#f1f5f9; }
+  .ref-scope-info { font-size:10px; color:#64748b; margin-left:auto; }
+  .ref-include-cb { cursor:pointer; accent-color:#4f46e5; flex-shrink:0; margin-right:2px; }
+  .ref-excluded .ref-sched-code,
+  .ref-excluded .ref-sched-name { opacity:.4; text-decoration:line-through; }
+  .ref-excluded .ref-sched-pills { opacity:.35; }
+  html.dark .ref-scope-btn { background:#1e2a3a; border-color:#2d3748; color:#94a3b8; }
+  html.dark .ref-scope-btn:hover { background:#253347; }
+  html.dark .ref-scope-info { color:#64748b; }
+
   /* ── Schedule sections ── */
   html.dark .schedule-section         { background:#161b22; border-color:#2d3748; box-shadow:none; }
   html.dark .schedule-header          { background:#1a2233; border-bottom-color:#2d3748; }
@@ -1125,13 +1140,101 @@ const SYSTEM_REFS = {
   }
 };
 
+// ─── Plain-English descriptions per schedule ref ──────────────────────────────
+const REF_DESCS = {
+  // LV Distribution
+  '44-02': 'LV switchboards & distribution boards',
+  '44-07': 'LV cables & wiring systems',
+  '44-10': 'Capacitors & power factor correction',
+  '44-11': 'EICR periodic inspection & testing',
+  '44-13': 'RCDs, RCBOs & arc fault detection devices',
+  '44-18': 'Contactors & motor starters',
+  '44-20': 'LV feeder pillars',
+  '44-21': 'Neutral earth panels & harmonic filters',
+  '44-22': 'Power line filters',
+  '44-23': 'Trapped key interlocks',
+  // Generators
+  '43-02': 'Diesel & gas generators',
+  '43-09': 'Generator fuel systems & storage tanks',
+  // UPS
+  '43-05': 'UPS systems',
+  '43-03': 'Battery systems (stationary batteries)',
+  '43-04': 'Inverters',
+  // Earthing
+  '44-06': 'Earthing systems & earth electrodes',
+  '38-01': 'Main earthing & bonding conductors',
+  '38-02': 'Supplementary bonding',
+  // HV
+  '70-02': 'HV cables',
+  '70-03': 'Oil-filled switchgear',
+  '70-05': 'Non-oil switchgear (SF6 / vacuum — indoor)',
+  '70-06': 'Vacuum switchgear (outdoor)',
+  '70-07': 'HV fuses',
+  '70-08': 'Overhead lines',
+  '70-09': 'HV transformers',
+  // Smoke Control
+  '52-02': 'Natural smoke & heat exhaust ventilators (NSHEV / AOV)',
+  '52-03': 'Powered smoke & heat exhaust ventilators (PSHEV)',
+  '52-04': 'Smoke curtains & barriers — active (motorised)',
+  '52-05': 'Smoke curtains & barriers — static (fixed)',
+  '52-06': 'Mechanical smoke extract systems',
+  '52-07': 'Natural smoke shaft systems',
+  '52-08': 'Stairwell & corridor pressurisation',
+  '52-10': 'Car park smoke control (jet fans)',
+  // Pumps
+  '45-01': 'Duty / standby pump sets',
+  '45-02': 'Submersible pumps',
+  '45-03': 'Inline & circulating pumps',
+  '45-04': 'Booster pump sets',
+  '45-12': 'Pressurisation units',
+  '40-25': 'Water tanks & storage vessels',
+  // HVAC
+  '03-01': 'Dehumidification & HVAC units',
+  // Lighting & Controls
+  '37-01': 'Emergency lighting — monthly testing',
+  '37-02': 'Emergency lighting — annual testing',
+  '37-03': 'Emergency lighting — central battery systems',
+  '37-04': 'Emergency lighting — vented battery systems',
+  '37-05': 'Lighting controls (DALI, BMS, scene-setting)',
+  '14-25': 'Automatic transfer & bypass switch panels',
+  // HTM 06
+  'HTM 06-01': 'HV installations — general',
+  'HTM 06-02': 'HV switchgear — general',
+  'HTM 06-03': 'Oil-filled switchgear (HTM)',
+  'HTM 06-04': 'Non-oil switchgear (HTM)',
+  'HTM 06-05': 'Vacuum switchgear (HTM)',
+  'HTM 06-06': 'Fluid-filled transformers',
+  'HTM 06-07': 'Cast resin transformers',
+  'HTM 06-08': 'Ring main units (RMU)',
+  'HTM 06-09': 'LV electrical installations — general',
+  'HTM 06-10': 'Electrical supply to pumps & motors',
+  'HTM 06-11': 'LV switchgear & controlgear',
+  'HTM 06-12': 'Standby generators',
+  'HTM 06-14': 'Earthing & bonding — general',
+  'HTM 06-15': 'Earth electrode testing',
+  'HTM 06-16': 'Protective multiple earthing (PME)',
+  'HTM 06-17': 'Cable containment (conduits & trunking)',
+  'HTM 06-18': 'Busbar systems',
+  'HTM 06-19': 'UPS & battery systems',
+  'HTM 06-20': 'Isolated power supplies (IPS / medical IT)',
+  'HTM 06-21': 'Harmonic filters',
+  'HTM 06-22': 'Power factor correction units',
+  'HTM 06-23': 'Periodic inspection & testing (electrical contractor)',
+  'HTM 06-24': 'Portable appliance testing (PAT)',
+  'HTM 06-25': 'HV cables & joints (HTM)',
+};
+
 // ─── Owner helper ─────────────────────────────────────────────────────────────
 function getRefOwner(refs, ref) {
   return (refs.owners && refs.owners[ref]) || refs.default_owner || 'subcontractor';
 }
 
 // ─── Synonym expansion ────────────────────────────────────────────────────────
+// Keys are task tokens; values are the contract-side phrases they should match
+// (and vice versa, because tokenise() runs on both sides).
 const SYNONYMS = {
+
+  // ── Existing / kept ───────────────────────────────────────────────────────
   'ups':            ['uninterruptible power supply','uninterruptible'],
   'rcd':            ['residual current device','residual current'],
   'afdd':           ['arc fault detection','arc fault'],
@@ -1147,14 +1250,188 @@ const SYNONYMS = {
   'pressurisation': ['pressurising unit', 'pressurizing unit', 'booster set'],
   'operation':      ['operational test', 'function test', 'run test'],
   'settings':       ['set point', 'setpoint'],
-  'service':        ['servicing', 'overhaul'],
-  'servicing':      ['service', 'overhaul'],
-  'maintenance':    ['servicing', 'service'],
-  // Emergency lighting: IS3217 (Irish standard) implies testing of both self-contained
-  // and centrally powered fittings — expand so contracts citing the standard match tasks
+  'service':        ['servicing', 'overhaul', 'maintain', 'maintenance'],
+  'servicing':      ['service', 'overhaul', 'maintain', 'maintenance'],
+  'maintenance':    ['servicing', 'service', 'maintain', 'upkeep'],
+  'maintain':       ['maintenance', 'service', 'servicing', 'upkeep'],
+  // Irish emergency lighting standard implies both self-contained and central fittings
   'is3217':         ['self contained', 'centrally powered', 'emergency lighting'],
   'filter':         ['filters', 'filtration', 'filter change', 'filter replacement'],
   'filters':        ['filter', 'filtration', 'filter change'],
+
+  // ── Test / inspect / check family ────────────────────────────────────────
+  // FM contracts say "exercise", "run", "functional test", "carry out inspection"
+  // where SFG20/HTM task titles say "Test", "Inspect", "Check"
+  'test':           ['testing', 'tested', 'tests', 'inspect', 'inspection',
+                     'check', 'examine', 'exercise', 'verify', 'prove', 'trial',
+                     'functional', 'function'],
+  'testing':        ['test', 'inspection', 'checking', 'examination'],
+  'inspect':        ['inspecting', 'inspection', 'test', 'check', 'examine',
+                     'survey', 'assess', 'visual'],
+  'inspection':     ['inspect', 'inspecting', 'test', 'testing', 'check',
+                     'survey', 'assessment', 'examine'],
+  'check':          ['checking', 'checks', 'test', 'inspect', 'verify', 'examine'],
+  'checking':       ['check', 'inspection', 'test'],
+  'examine':        ['test', 'inspect', 'check', 'assess', 'survey'],
+  'exercise':       ['test', 'testing', 'run', 'operate', 'function', 'start'],
+  'verify':         ['verification', 'test', 'check', 'confirm', 'prove'],
+  'verification':   ['verify', 'test', 'check', 'confirm'],
+
+  // ── Operational / functional ─────────────────────────────────────────────
+  'functional':     ['function', 'test', 'testing', 'operational', 'operation'],
+  'operational':    ['operation', 'functional', 'test', 'testing', 'function'],
+  'function':       ['functional', 'operational', 'test', 'testing'],
+  'run':            ['running', 'exercise', 'test', 'operate', 'start'],
+  'running':        ['run', 'operate', 'exercise', 'test'],
+  'start':          ['starting', 'startup', 'exercise', 'run'],
+  'startup':        ['start', 'commissioning', 'exercise', 'run'],
+
+  // ── Visual / survey ───────────────────────────────────────────────────────
+  'visual':         ['visual inspection', 'inspect', 'inspection', 'examine'],
+  'survey':         ['inspect', 'inspection', 'assess', 'assessment', 'examine'],
+  'assessment':     ['assess', 'inspect', 'inspection', 'survey', 'evaluate'],
+  'assess':         ['assessment', 'inspect', 'test', 'survey'],
+
+  // ── Clean / flush / purge ─────────────────────────────────────────────────
+  'clean':          ['cleaning', 'flush', 'flushing', 'purge', 'rinse',
+                     'descale', 'disinfect'],
+  'cleaning':       ['clean', 'flush', 'flushing', 'purge', 'rinse'],
+  'flush':          ['flushing', 'purge', 'purging', 'clean', 'cleaning', 'rinse'],
+  'flushing':       ['flush', 'purge', 'purging', 'cleaning', 'clean'],
+  'purge':          ['purging', 'flush', 'flushing', 'vent', 'drain'],
+  'purging':        ['purge', 'flush', 'flushing'],
+  'drain':          ['draining', 'empty', 'flush'],
+  'draining':       ['drain', 'empty', 'flush'],
+  'descale':        ['descaling', 'scale removal', 'clean'],
+  'descaling':      ['descale', 'clean', 'scale removal'],
+  'disinfect':      ['disinfection', 'sterilise', 'clean'],
+  'disinfection':   ['disinfect', 'sterilise', 'treat'],
+
+  // ── Lubrication ───────────────────────────────────────────────────────────
+  'lubricate':      ['lubrication', 'lubricating', 'oil', 'grease', 'greasing'],
+  'lubrication':    ['lubricate', 'lubricating', 'oil', 'grease'],
+  'lubricating':    ['lubricate', 'lubrication', 'oil', 'grease'],
+  'grease':         ['greasing', 'lubricate', 'lubrication', 'oil'],
+  'greasing':       ['grease', 'lubricate', 'lubrication'],
+
+  // ── Replace / renew ───────────────────────────────────────────────────────
+  'replace':        ['replacement', 'replacing', 'renew', 'renewal', 'change'],
+  'replacement':    ['replace', 'replacing', 'renew', 'renewal', 'change'],
+  'replacing':      ['replace', 'replacement', 'renew'],
+  'renew':          ['renewal', 'replace', 'replacement', 'change'],
+  'renewal':        ['renew', 'replace', 'replacement'],
+
+  // ── Adjust / calibrate / balance ──────────────────────────────────────────
+  'adjust':         ['adjustment', 'calibrate', 'calibration', 'tune', 'balance'],
+  'adjustment':     ['adjust', 'calibrate', 'calibration'],
+  'calibrate':      ['calibration', 'adjust', 'set', 'tune'],
+  'calibration':    ['calibrate', 'adjust', 'set'],
+  'balance':        ['balancing', 'adjust', 'adjustment'],
+  'balancing':      ['balance', 'adjust', 'commission'],
+
+  // ── Monitor / record ──────────────────────────────────────────────────────
+  'monitor':        ['monitoring', 'log', 'record', 'measure', 'trend'],
+  'monitoring':     ['monitor', 'log', 'record', 'measure'],
+  'record':         ['recording', 'log', 'monitor', 'measure', 'reading'],
+  'recording':      ['record', 'log', 'measure'],
+  'measure':        ['measurement', 'measuring', 'record', 'reading'],
+  'measurement':    ['measure', 'measuring', 'reading', 'record'],
+  'reading':        ['readings', 'record', 'log', 'measure'],
+
+  // ── HVAC acronyms ─────────────────────────────────────────────────────────
+  'ahu':            ['air handling unit', 'air handler', 'air handling'],
+  'fcu':            ['fan coil unit', 'fan coil'],
+  'rtu':            ['rooftop unit', 'roof top unit'],
+  'vav':            ['variable air volume'],
+  'vrf':            ['variable refrigerant flow', 'variable refrigerant volume'],
+  'vrv':            ['variable refrigerant volume', 'variable refrigerant flow'],
+  'mau':            ['makeup air unit', 'make-up air unit'],
+  'crac':           ['computer room air conditioning', 'precision cooling'],
+  'crah':           ['computer room air handler'],
+  'chiller':        ['refrigeration plant', 'refrigeration unit', 'cooling plant'],
+  'boiler':         ['heating plant', 'heat generator', 'boiler plant'],
+  'condenser':      ['condenser unit', 'condensing unit'],
+  'compressor':     ['refrigeration compressor', 'air compressor'],
+  'humidifier':     ['humidification unit', 'humidification system'],
+  'dehumidifier':   ['dehumidification unit', 'dehumidification system'],
+  'ashp':           ['air source heat pump', 'heat pump'],
+  'gshp':           ['ground source heat pump', 'heat pump'],
+
+  // ── Electrical acronyms ───────────────────────────────────────────────────
+  'mdb':            ['main distribution board', 'main switchboard', 'main panel'],
+  'sdb':            ['sub distribution board', 'sub-distribution board'],
+  'edb':            ['emergency distribution board'],
+  'mcb':            ['miniature circuit breaker', 'circuit breaker'],
+  'rccb':           ['residual current circuit breaker', 'residual current device'],
+  'ats':            ['automatic transfer switch', 'transfer switch',
+                     'automatic changeover'],
+  'avr':            ['automatic voltage regulator', 'voltage regulator'],
+  'pfc':            ['power factor correction', 'capacitor bank'],
+  'switchboard':    ['distribution board', 'panel board', 'main distribution board'],
+  'switchgear':     ['switchboard', 'distribution board', 'panel board'],
+  'transformer':    ['isolating transformer', 'step down transformer'],
+  'inverter':       ['power inverter', 'static inverter', 'power converter'],
+  'contactor':      ['starter', 'motor starter'],
+  'insulation':     ['insulation resistance', 'megger test', 'ir test'],
+  'continuity':     ['continuity test', 'circuit continuity', 'loop test'],
+  'earth':          ['earthing', 'grounding', 'ground', 'earth electrode'],
+  'earthing':       ['earth', 'grounding', 'ground'],
+
+  // ── Mechanical / pipework ─────────────────────────────────────────────────
+  'strainer':       ['strainer basket', 'y-strainer', 'filter strainer'],
+  'prv':            ['pressure reducing valve', 'pressure relief valve',
+                     'pressure regulating valve'],
+  'thermostat':     ['temperature controller', 'temperature control'],
+  'motor':          ['electric motor', 'drive motor', 'pump motor', 'fan motor'],
+  'belt':           ['drive belt', 'v-belt', 'fan belt'],
+  'bearing':        ['bearings', 'lubricate', 'lubrication'],
+
+  // ── Fire / life safety ────────────────────────────────────────────────────
+  'sprinkler':      ['fire suppression', 'suppression system', 'deluge',
+                     'wet riser', 'sprinkler system'],
+  'suppression':    ['sprinkler', 'sprinkler system', 'fire suppression', 'deluge'],
+  'extinguisher':   ['portable extinguisher', 'fire extinguisher'],
+  'fas':            ['fire alarm system', 'fire alarm'],
+  'afd':            ['automatic fire detection', 'fire detection', 'fire alarm'],
+  'mcp':            ['manual call point', 'break glass', 'call point'],
+  'riser':          ['wet riser', 'dry riser', 'rising main'],
+  'hydrant':        ['fire hydrant', 'landing valve'],
+  'hose':           ['hose reel', 'fire hose'],
+  'fm200':          ['gaseous suppression', 'clean agent', 'fire suppression'],
+  'novec':          ['gaseous suppression', 'clean agent', 'fire suppression'],
+  'gaseous':        ['gaseous suppression', 'co2 suppression', 'fm200', 'novec',
+                     'clean agent'],
+
+  // ── BMS / controls ────────────────────────────────────────────────────────
+  'bms':            ['building management system', 'building energy management',
+                     'building controls', 'building automation'],
+  'ems':            ['energy management system', 'energy management'],
+  'scada':          ['supervisory control', 'control system'],
+  'ddc':            ['direct digital control', 'digital controller'],
+
+  // ── Water / L8 ────────────────────────────────────────────────────────────
+  'legionella':     ['legionella control', 'water hygiene', 'legionnaires', 'l8'],
+  'l8':             ['legionella', 'legionella control', 'water hygiene'],
+  'tmv':            ['thermostatic mixing valve', 'mixing valve', 'temperature mixing'],
+  'calorifier':     ['hot water calorifier', 'water heater', 'hot water cylinder'],
+  'cwst':           ['cold water storage tank', 'cold water tank', 'storage tank'],
+  'lthw':           ['low temperature hot water', 'heating system', 'heating circuit'],
+  'chw':            ['chilled water', 'chilled water system'],
+  'dhw':            ['domestic hot water', 'hot water service'],
+  'glycol':         ['antifreeze', 'inhibitor', 'glycol concentration'],
+  'inhibitor':      ['corrosion inhibitor', 'chemical treatment', 'glycol'],
+
+  // ── Emergency / standby ───────────────────────────────────────────────────
+  'generator':      ['genset', 'standby generator', 'diesel generator',
+                     'emergency generator', 'backup generator'],
+  'standby':        ['backup', 'emergency', 'reserve'],
+  'battery':        ['batteries', 'battery bank', 'accumulator', 'lead acid'],
+  'batteries':      ['battery', 'battery bank', 'accumulator'],
+  'charger':        ['battery charger', 'trickle charger', 'rectifier'],
+
+  // ── Structural / cable ────────────────────────────────────────────────────
+  'busbar':         ['busbar chamber', 'busbar trunking', 'rising busbar'],
+  'trunking':       ['busbar trunking', 'cable trunking', 'containment'],
 };
 const SYNONYM_REVERSE = {};
 for (const [abbr, expansions] of Object.entries(SYNONYMS)) {
@@ -1788,6 +2065,76 @@ const llmCache = {
   },
 };
 
+// ─── Ref scope (sub-type selection) ───────────────────────────────────────────
+const REF_SCOPE_KEY = 'ppm_ref_scope_v1';
+
+function _refScopeStore() {
+  try { return JSON.parse(localStorage.getItem(REF_SCOPE_KEY) || '{}'); } catch { return {}; }
+}
+function _refScopeSave(data) {
+  try { localStorage.setItem(REF_SCOPE_KEY, JSON.stringify(data)); } catch {}
+}
+
+function isRefIncluded(sysKey, ref) {
+  const store = _refScopeStore();
+  if (!store[sysKey]) return true; // default: all included
+  return store[sysKey][ref] !== false;
+}
+
+function getActiveRefs(sysKey) {
+  const refs = SYSTEM_REFS[sysKey];
+  return [...refs.sfg20, ...refs.htm06].filter(ref => isRefIncluded(sysKey, ref));
+}
+
+function toggleRefInclude(sysKey, ref, cb) {
+  const store = _refScopeStore();
+  if (!store[sysKey]) {
+    // Initialise all refs as included before recording first exclusion
+    store[sysKey] = {};
+    [...SYSTEM_REFS[sysKey].sfg20, ...SYSTEM_REFS[sysKey].htm06]
+      .forEach(r => { store[sysKey][r] = true; });
+  }
+  store[sysKey][ref] = cb.checked;
+  _refScopeSave(store);
+  const schedEl = document.getElementById('refsched-' + ref);
+  if (schedEl) schedEl.classList.toggle('ref-excluded', !cb.checked);
+  updateRefScopeInfo(sysKey);
+}
+
+function selectAllRefs(sysKey, include) {
+  const store = _refScopeStore();
+  store[sysKey] = {};
+  [...SYSTEM_REFS[sysKey].sfg20, ...SYSTEM_REFS[sysKey].htm06]
+    .forEach(r => { store[sysKey][r] = include; });
+  _refScopeSave(store);
+  // Sync checkboxes + dimming
+  [...SYSTEM_REFS[sysKey].sfg20, ...SYSTEM_REFS[sysKey].htm06].forEach(ref => {
+    const cb  = document.getElementById('cb-' + ref.replace(/[^a-zA-Z0-9]/g, '-'));
+    if (cb) cb.checked = include;
+    const el  = document.getElementById('refsched-' + ref);
+    if (el) el.classList.toggle('ref-excluded', !include);
+  });
+  updateRefScopeInfo(sysKey);
+}
+
+function updateRefScopeInfo(sysKey) {
+  const el = document.getElementById('refScopeInfo');
+  if (!el) return;
+  const refs    = SYSTEM_REFS[sysKey];
+  const all     = [...refs.sfg20, ...refs.htm06];
+  const active  = all.filter(ref => isRefIncluded(sysKey, ref));
+  const EXCL    = new Set(['0U','1D']);
+  const nTasks  = active.reduce((s, ref) =>
+    s + (tasksByRef[ref] || []).filter(t => !t.withdrawn && !EXCL.has(t.frequency)).length, 0);
+  if (active.length === all.length) {
+    el.textContent = `${all.length} schedules · ${nTasks} tasks`;
+    el.style.color = '';
+  } else {
+    el.textContent = `${active.length} of ${all.length} schedules · ${nTasks} tasks`;
+    el.style.color = '#d97706';
+  }
+}
+
 // ─── Data loading ─────────────────────────────────────────────────────────────
 async function loadData() {
   try {
@@ -1846,16 +2193,23 @@ function updateRefBox() {
   const FREQ_LABEL = { '1M':'Monthly','3M':'3-Monthly','6M':'6-Monthly',
     '12M':'Annual','24M':'2-Yearly','0U':'On-demand' };
 
-  let html = '';
+  let html = `<div class="ref-scope-bar">
+    <button class="ref-scope-btn" onclick="selectAllRefs('${escAttr(sys)}',true)">All</button>
+    <button class="ref-scope-btn" onclick="selectAllRefs('${escAttr(sys)}',false)">None</button>
+    <span class="ref-scope-info" id="refScopeInfo"></span>
+  </div>`;
+
   for (const ref of allRefs) {
-    const tasks   = tasksByRef[ref] || [];
-    const first   = tasks[0] || {};
-    const title   = first.schedule_title || ref;
-    const src     = first.source || (ref.startsWith('HTM') ? 'HTM 06' : 'SFG20');
-    const nHigh   = tasks.filter(t => t.criticality_norm === 'HIGH').length;
-    const nSafe   = tasks.filter(t => t.safety_flag).length;
-    const srcCol  = src.includes('HTM') ? '#dbeafe' : '#ede9fe';
-    const srcTxt  = src.includes('HTM') ? '#1e40af' : '#5b21b6';
+    const tasks    = tasksByRef[ref] || [];
+    const first    = tasks[0] || {};
+    const title    = first.schedule_title || ref;
+    const src      = first.source || (ref.startsWith('HTM') ? 'HTM 06' : 'SFG20');
+    const nHigh    = tasks.filter(t => t.criticality_norm === 'HIGH').length;
+    const nSafe    = tasks.filter(t => t.safety_flag).length;
+    const srcCol   = src.includes('HTM') ? '#dbeafe' : '#ede9fe';
+    const srcTxt   = src.includes('HTM') ? '#1e40af' : '#5b21b6';
+    const included = isRefIncluded(sys, ref);
+    const cbId     = 'cb-' + ref.replace(/[^a-zA-Z0-9]/g, '-');
 
     const pills = `
       <span class="ref-pill ref-pill-src" style="background:${srcCol};color:${srcTxt}">${src}</span>
@@ -1877,8 +2231,12 @@ function updateRefBox() {
     }).join('');
 
     html += `
-      <div class="ref-sched" id="refsched-${escAttr(ref)}">
+      <div class="ref-sched${included ? '' : ' ref-excluded'}" id="refsched-${escAttr(ref)}">
         <div class="ref-sched-hdr" onclick="toggleRefSched('${escAttr(ref)}')">
+          <input type="checkbox" id="${escAttr(cbId)}" class="ref-include-cb"
+                 ${included ? 'checked' : ''}
+                 onclick="event.stopPropagation();toggleRefInclude('${escAttr(sys)}','${escAttr(ref)}',this)"
+                 title="Include this schedule in the compliance check">
           <span class="ref-sched-arrow">▶</span>
           <span class="ref-sched-code">${escHtml(ref)}</span>
           <span class="ref-sched-name">${escHtml(title)}</span>
@@ -1888,6 +2246,7 @@ function updateRefBox() {
       </div>`;
   }
   el.innerHTML = html;
+  updateRefScopeInfo(sys);
 }
 
 function toggleRefSched(ref) {
@@ -2291,7 +2650,7 @@ function runCheck() {
   if (!contractText.trim()) { showError('Please provide contract text.'); return; }
 
   const refs    = SYSTEM_REFS[sysKey];
-  const allRefs = [...refs.sfg20, ...refs.htm06];
+  const allRefs = getActiveRefs(sysKey);
 
   // Exclude operator/EICR tasks that are never subcontractor responsibilities.
   // 0U (on-demand/reactive) = EICR-type or commissioning — separate electrical contractor.
@@ -2531,7 +2890,7 @@ function animateDashboard() {
 
 function renderResults(sysKey, freqHits) {
   const refs    = SYSTEM_REFS[sysKey];
-  const allRefs = [...refs.sfg20, ...refs.htm06];
+  const allRefs = getActiveRefs(sysKey);
 
   document.getElementById('summaryBar').innerHTML = buildSummaryHTML(freqHits);
 
@@ -2812,7 +3171,7 @@ const _origRenderResults = renderResults;
 // Override renderResults to stash freqHits
 function renderResults(sysKey, freqHits) {
   const refs    = SYSTEM_REFS[sysKey];
-  const allRefs = [...refs.sfg20, ...refs.htm06];
+  const allRefs = getActiveRefs(sysKey);
 
   const bar = document.getElementById('summaryBar');
   bar.innerHTML = buildSummaryHTML(freqHits);
