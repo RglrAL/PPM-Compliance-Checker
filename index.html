@@ -121,10 +121,18 @@
   .evidence-btn:hover { opacity: 1; text-decoration: underline; }
   .evidence-row td { padding: 0 !important; border-bottom: 1px solid #e2e8f0 !important; }
   .evidence-panel { padding: 8px 16px 12px; background: #f0f7ff; }
+  .evidence-panel-missing { background: #fffbeb; }
+  .evidence-panel-missing .evidence-label { font-size: 10px; font-weight: 700;
+    color: #92400e; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
+  .evidence-panel-missing .evidence-snippet { border-left-color: #d97706; }
   .evidence-snippet { font-size: 11px; color: #334155; line-height: 1.65; margin-bottom: 5px;
                       padding: 6px 10px; background: white; border-radius: 6px;
                       border-left: 3px solid #1a6b8a; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
   .evidence-snippet mark { background: #fef9c3; color: #334155; padding: 0 2px; border-radius: 2px; }
+  .evidence-snippet.negated { border-left-color: #f97316; background: #fff7ed; }
+  .negation-warn { display:inline-block; font-size:9px; font-weight:700; color:#c2410c;
+                   background:#ffedd5; border-radius:4px; padding:1px 5px; margin-right:5px;
+                   vertical-align:middle; white-space:nowrap; }
   tr.row-hidden + tr.evidence-row { display: none !important; }
 
   /* ── Full-screen editor modal ── */
@@ -236,6 +244,13 @@
   .smb-cov { background: #22c55e; } .smb-par { background: #f59e0b; } .smb-mis { background: #ef4444; }
   /* Schedule section accent border */
   .schedule-section { transition: border-left-color .3s; }
+  .scope-badge { font-size:9px; font-weight:700; color:#64748b; background:#f1f5f9;
+                 border:1px solid #e2e8f0; border-radius:4px; padding:1px 6px;
+                 margin-left:6px; vertical-align:middle; white-space:nowrap; }
+  .schedule-section.out-of-scope { opacity:.75; }
+  .scope-notice { font-size:11px; color:#64748b; background:#f8fafc; border:1px solid #e2e8f0;
+                  border-radius:8px; padding:8px 14px; margin-bottom:10px; }
+  .scope-notice strong { color:#475569; }
   /* Mobile — dashboard */
   @media (max-width: 640px) {
     .dash-hdr { padding: 12px 16px; }
@@ -337,7 +352,9 @@
   .crit-high   { color: #b91c1c; font-weight: 700; }
   .crit-medium { color: #a16207; }
   .crit-low    { color: #64748b; }
-  .conf-badge  { font-size: 10px; color: #64748b; background: #f1f5f9; border-radius: 5px; padding: 2px 7px; font-weight: 500; }
+  .conf-badge      { font-size: 10px; color: #64748b; background: #f1f5f9; border-radius: 5px; padding: 2px 7px; font-weight: 500; }
+  .conf-badge-near { background: #dcfce7; color: #15803d; font-weight: 700; }  /* PARTIAL 40-49% — nearly covered */
+  .conf-badge-weak { background: #fef3c7; color: #92400e; font-weight: 700; }  /* PARTIAL 25-39% — weak match    */
   .freq-ok  { color: #16a34a; font-size: 10px; font-weight: 600; }
   .freq-bad { color: #dc2626; font-size: 10px; font-weight: 700; }
   .freq-unk { color: #94a3b8; font-size: 10px; }
@@ -583,8 +600,13 @@
   /* ── Evidence ── */
   html.dark .evidence-row td    { border-bottom-color:#2d3748 !important; }
   html.dark .evidence-panel     { background:#1a2233; }
-  html.dark .evidence-snippet   { background:#1e2a3a; border-left-color:#38bdf8; color:#cbd5e1; box-shadow:none; }
-  html.dark .evidence-snippet mark { background:#713f12; color:#fde68a; }
+  html.dark .evidence-panel-missing { background:#292524; }
+  html.dark .evidence-panel-missing .evidence-label { color:#fbbf24; }
+  html.dark .evidence-panel-missing .evidence-snippet { border-left-color:#d97706; }
+  html.dark .evidence-snippet         { background:#1e2a3a; border-left-color:#38bdf8; color:#cbd5e1; box-shadow:none; }
+  html.dark .evidence-snippet mark    { background:#713f12; color:#fde68a; }
+  html.dark .evidence-snippet.negated { background:#2d1a0e; border-left-color:#f97316; }
+  html.dark .negation-warn            { background:#431407; color:#fb923c; }
 
   /* ── Modal ── */
   html.dark .modal-box          { background:#161b22; box-shadow:0 20px 60px rgba(0,0,0,.7); }
@@ -657,6 +679,8 @@
 
   /* ── Schedule sections ── */
   html.dark .schedule-section         { background:#161b22; border-color:#2d3748; box-shadow:none; }
+  html.dark .scope-badge              { background:#1e2a3a; border-color:#2d3748; color:#64748b; }
+  html.dark .scope-notice             { background:#161b22; border-color:#2d3748; color:#64748b; }
   html.dark .schedule-header          { background:#1a2233; border-bottom-color:#2d3748; }
   html.dark .schedule-header:hover    { background:#1e2a3a; }
   html.dark .schedule-header-left     { color:#93c5fd; }
@@ -680,6 +704,8 @@
   html.dark .crit-medium          { color:#fbbf24; }
   html.dark .crit-low             { color:#94a3b8; }
   html.dark .conf-badge           { background:#1e2a3a; color:#94a3b8; }
+  html.dark .conf-badge-near      { background:#14532d; color:#86efac; }
+  html.dark .conf-badge-weak      { background:#292524; color:#fbbf24; }
   html.dark .freq-ok              { color:#4ade80; }
   html.dark .freq-bad             { color:#f87171; }
   html.dark .freq-unk             { color:#4b5563; }
@@ -1032,16 +1058,16 @@ const SYSTEM_REFS = {
     label: 'LV Distribution & Switchgear',
     default_owner: 'subcontractor',
     owners: {
-      '44-11':     'electrical_contractor', // EICR Periodic Inspection & Testing
       'HTM 06-23': 'electrical_contractor', // Periodic Inspection & Testing
     },
     // 44-01 removed — 0 tasks (Introductory Procedures only)
+    // 44-11 removed — all 4 tasks are 0U (EICR/on-demand), excluded from scoring; adds nothing
     // HTM 06-27 removed — organisational compliance audits (AE/AP), not LV equipment maintenance
     // HTM 06-17 added — cable containment (conduits/trunking) is part of LV system inspection
     // 44-18/20/21/22/23 added — LV equipment schedules (contactors, feeder pillars, neutral earth
     //   panels, power filters, trapped key interlocks); 44 additional tasks. These are SFG20-format
     //   documents also aligned with HTM06, frequently appearing in hospital LV SLAs.
-    sfg20: ['44-02','44-07','44-10','44-11','44-13',
+    sfg20: ['44-02','44-07','44-10','44-13',
             '44-18','44-20','44-21','44-22','44-23'],
     // HTM 06-18/21/22 added — busbar systems, harmonic filters, power factor correction units;
     //   12 additional tasks. Standard items on LV distribution SLAs, especially in healthcare.
@@ -1135,7 +1161,10 @@ const SYSTEM_REFS = {
     // HTM 06-26 removed — organisational AP housekeeping obligation
     // HTM 06-29 removed — Bedhead Services (medical gas/nurse call) is a separate discipline,
     //   not within scope of a lighting control SLA
-    sfg20: ['37-01','37-02','37-03','37-04','37-05','14-25'],
+    // 14-25 (Lighting Control Module) removed — DALI/BMS panel controller, not
+    // emergency lighting. Scored 0% on all emergency-lighting-scoped contracts,
+    // inflating MISSING counts. Use electrical_contractor owner for standalone LCM checks.
+    sfg20: ['37-01','37-02','37-03','37-04','37-05'],
     htm06: ['HTM 06-23']
   }
 };
@@ -1187,7 +1216,7 @@ const REF_DESCS = {
   '45-03': 'Inline & circulating pumps',
   '45-04': 'Booster pump sets',
   '45-12': 'Pressurisation units',
-  '40-25': 'Water tanks & storage vessels',
+  '40-25': 'Pressurisation units (chilled water, condenser water & LTHW)',
   // HVAC
   '03-01': 'Dehumidification & HVAC units',
   // Lighting & Controls
@@ -1196,7 +1225,7 @@ const REF_DESCS = {
   '37-03': 'Emergency lighting — central battery systems',
   '37-04': 'Emergency lighting — vented battery systems',
   '37-05': 'Lighting controls (DALI, BMS, scene-setting)',
-  '14-25': 'Automatic transfer & bypass switch panels',
+  '14-25': 'Lighting control module (DALI / BMS panel)',
   // HTM 06
   'HTM 06-01': 'HV installations — general',
   'HTM 06-02': 'HV switchgear — general',
@@ -1447,12 +1476,19 @@ const STOP_WORDS = new Set([
   'will','have','been','also','when','then','them','they','their',
 ]);
 
-function tokenise(text) {
+// Base tokenisation with no synonym expansion — used for the scoring denominator.
+// Synonyms only appear in the numerator (matching) so they can only help, never hurt.
+function tokeniseBase(text) {
   if (!text) return [];
-  const base = text.toLowerCase()
+  return text.toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter(w => w.length > 2 && !STOP_WORDS.has(w));
+}
+
+function tokenise(text) {
+  if (!text) return [];
+  const base = tokeniseBase(text);
   const expanded = [];
   for (const tok of base) {
     expanded.push(tok);
@@ -1470,11 +1506,18 @@ function ngrams(tokens, n) {
   return out;
 }
 
+// Pre-compile word-boundary regexes for SYNONYM_REVERSE phrases once at startup.
+// Avoids substring false-triggers: "uninterrupted" no longer fires UPS expansion.
+const _SYNONYM_REVERSE_RES = Object.entries(SYNONYM_REVERSE).map(([phrase, abbr]) => {
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return [new RegExp('(?<![a-z0-9])' + escaped + '(?![a-z0-9])', 'i'), abbr];
+});
+
 function expandText(text) {
   if (!text) return text;
   let t = text.toLowerCase();
-  for (const [phrase, abbr] of Object.entries(SYNONYM_REVERSE)) {
-    if (t.includes(phrase)) t += ' ' + abbr;
+  for (const [re, abbr] of _SYNONYM_REVERSE_RES) {
+    if (re.test(t)) t += ' ' + abbr;
   }
   return t;
 }
@@ -1533,13 +1576,13 @@ function splitSentences(text) {
 }
 
 function gatherEvidence(task, status) {
-  if (status === 'MISSING' || contractSentences.length === 0) return [];
+  if (contractSentences.length === 0) return [];
 
-  const titleToks = tokenise(task.title);
-  const notesToks = tokenise(task.notes || '');
-  const taskTerms = new Set([
-    ...titleToks, ...ngrams(titleToks, 2), ...ngrams(titleToks, 3),
-    ...notesToks, ...ngrams(notesToks, 2),
+  const titleToks  = tokenise(task.title);
+  const notesToks  = tokenise(task.notes || '');
+  const taskTerms  = new Set([
+    ...titleToks,  ...ngrams(titleToks,  2), ...ngrams(titleToks,  3),
+    ...notesToks,  ...ngrams(notesToks,  2),
   ]);
   if (taskTerms.size === 0) return [];
 
@@ -1554,10 +1597,30 @@ function gatherEvidence(task, status) {
     return { text: s, hits: matched.size, matchedTokens: [...matched] };
   });
 
+  const limit = status === 'MISSING' ? 2 : 3;
   return scored
     .filter(s => s.hits > 0)
     .sort((a, b) => b.hits - a.hits)
-    .slice(0, 3);
+    .slice(0, limit);
+}
+
+// Detects common negation patterns in a sentence.
+// Checks for negation words within 6 words of any matched token.
+const _NEGATION_RE = /\b(not|no\b|never|without|exclud|except|does\s+not|do\s+not|did\s+not|will\s+not|won't|don't|doesn't|didn't|isn't|aren't|wasn't|weren't|cannot|can't|unable|outside\s+(the\s+)?scope)\b/i;
+
+function isNegatedSentence(sentenceText, matchedTokens) {
+  if (!matchedTokens.length) return false;
+  const lower = sentenceText.toLowerCase();
+  if (!_NEGATION_RE.test(lower)) return false;
+  // Only flag if negation appears within 6 words of a matched token
+  const words = lower.split(/\s+/);
+  const negIdx = words.findIndex(w => _NEGATION_RE.test(w));
+  if (negIdx === -1) return false;
+  for (const tok of matchedTokens) {
+    const tokIdx = words.findIndex(w => w.includes(tok));
+    if (tokIdx !== -1 && Math.abs(tokIdx - negIdx) <= 6) return true;
+  }
+  return false;
 }
 
 function highlightEvidence(sentenceText, matchedTokens) {
@@ -1577,7 +1640,8 @@ function toggleEvidence(btn) {
   const open = evRow.style.display === '';
   evRow.style.display = open ? 'none' : '';
   btn.setAttribute('aria-expanded', !open);
-  btn.textContent = open ? '▶ evidence' : '▼ evidence';
+  const label = evRow.querySelector('.evidence-panel-missing') ? 'nearest' : 'evidence';
+  btn.textContent = open ? `▶ ${label}` : `▼ ${label}`;
 }
 
 // ─── LLM semantic review ──────────────────────────────────────────────────────
@@ -1883,28 +1947,48 @@ function acceptLlmSuggestion(taskId, status, btn) {
 }
 
 // ─── Task presence scoring ────────────────────────────────────────────────────
+// Count hits per base-token slot (max 1 per slot) so a single base token
+// cannot generate multiple hits via its synonym expansions.
+function _slotHits(baseToks, contractIndex) {
+  let hits = 0;
+  for (const tok of baseToks) {
+    const candidates = [tok, ...(SYNONYMS[tok] || []).flatMap(s => s.split(' '))];
+    if (candidates.some(c => contractIndex.has(c) || (c.length >= 8 && fuzzyInContract(c)))) hits++;
+  }
+  return hits;
+}
+
 function taskPresence(task, contractIndex) {
-  const titleToks = tokenise(task.title);
-  const notesToks = tokenise(task.notes || '');
+  // Title: base tokens for denominator; slot-based hits for numerator.
+  const titleToksBase = tokeniseBase(task.title);
+  // Action text (first 300 chars) gives discriminating technical content missing from short titles.
+  const actionText    = (task.action || '').slice(0, 300);
+  const notesText     = task.notes || '';
 
-  const titleTerms = [...titleToks, ...ngrams(titleToks, 2), ...ngrams(titleToks, 3)];
-  const notesTerms = [...notesToks, ...ngrams(notesToks, 2)];
+  if (titleToksBase.length === 0) return 0;
 
-  if (titleTerms.length === 0) return 0;
+  // Title score: 1 hit per base token slot (synonym-safe).
+  const titleSlotHits = _slotHits(titleToksBase, contractIndex);
+  // Also check title bigrams/trigrams for phrase-level matches.
+  const titleToksExp  = tokenise(task.title);
+  const titleNgramHits = [...ngrams(titleToksExp, 2), ...ngrams(titleToksExp, 3)]
+    .filter(t => contractIndex.has(t)).length;
+  const titleTermsBase = [...titleToksBase, ...ngrams(titleToksBase, 2), ...ngrams(titleToksBase, 3)];
+  const titleHits  = titleSlotHits + titleNgramHits;
+  const titleScore = Math.min(1.0, titleHits / titleTermsBase.length);
 
-  const titleHits = titleTerms.filter(t =>
-    contractIndex.has(t) || (!t.includes(' ') && fuzzyInContract(t))
-  ).length;
-  const notesHits = notesTerms.filter(t =>
-    contractIndex.has(t) || (!t.includes(' ') && fuzzyInContract(t))
-  ).length;
+  // Notes + action boost: slot-based, capped at 0.4 combined.
+  const auxText     = notesText + ' ' + actionText;
+  const auxToksBase = tokeniseBase(auxText);
+  const auxSlotHits = _slotHits(auxToksBase, contractIndex);
+  const auxBoost    = auxToksBase.length > 0
+    ? Math.min(0.4, (auxSlotHits / auxToksBase.length) * 0.4)
+    : 0;
 
-  const titleScore = titleHits / titleTerms.length;
-  const notesBoost = notesTerms.length > 0 ? (notesHits / notesTerms.length) * 0.5 : 0;
-  const raw = Math.min(1.0, titleScore + notesBoost);
+  const raw = Math.min(1.0, titleScore + auxBoost);
 
-  // Short-title guard: ≤2 meaningful tokens → cap at PARTIAL max
-  if (titleToks.length <= 2) return Math.min(raw, 0.49);
+  // Short-title guard: single-token titles only → cap at PARTIAL max.
+  if (titleToksBase.length <= 2) return Math.min(raw, 0.49);
 
   return raw;
 }
@@ -1956,8 +2040,10 @@ function bestContractFreq(freqHits, taskDays) {
 
 // ─── Assess a single task ─────────────────────────────────────────────────────
 function assessTask(task, contractIndex, freqHits) {
-  const score  = taskPresence(task, contractIndex);
-  let   status = score >= 0.5 ? 'COVERED' : score >= 0.25 ? 'PARTIAL' : 'MISSING';
+  // If the contract explicitly cites this task's schedule ref, treat as COVERED
+  // before running keyword matching (schedule-reference detection, Phase 1c).
+  const score  = task._refCited ? 1.0 : taskPresence(task, contractIndex);
+  let   status = score >= 0.65 ? 'COVERED' : score >= 0.25 ? 'PARTIAL' : 'MISSING';
   let freqOk;
   if (!task.frequency_days || !freqHits.length) {
     freqOk = 'UNKNOWN';
@@ -1965,10 +2051,14 @@ function assessTask(task, contractIndex, freqHits) {
     const best = bestContractFreq(freqHits, task.frequency_days);
     freqOk = best ? 'COMPLIANT' : 'NON_COMPLIANT';
   }
-  // Frequency cap: a task cannot be COVERED if the contract visits less frequently
-  // than required. UNKNOWN is not capped — absence of frequency language in the
-  // contract text does not imply a gap (frequency may be specified elsewhere).
-  if (freqOk === 'NON_COMPLIANT' && status === 'COVERED') status = 'PARTIAL';
+  // Frequency cap: demote COVERED→PARTIAL when contract frequency is too low.
+  // For HIGH-criticality tasks, also demote PARTIAL→MISSING so the verdict
+  // treats a frequency-non-compliant HIGH task the same as an absent one.
+  // UNKNOWN is never capped — absence of frequency language ≠ a gap.
+  if (freqOk === 'NON_COMPLIANT') {
+    if (status === 'COVERED') status = 'PARTIAL';
+    if (status === 'PARTIAL' && task.criticality_norm === 'HIGH') status = 'MISSING';
+  }
   const evidence = gatherEvidence(task, status);
   return {
     task_id:          task.task_id,
@@ -1986,31 +2076,47 @@ function assessTask(task, contractIndex, freqHits) {
     schedule_title:   task.schedule_title,
     source:           task.source,
     evidence,
-    owner:            task._owner || 'subcontractor',
+    owner:            task._owner        || 'subcontractor',
+    scope_status:     task._scopeStatus  || 'in_scope',
   };
 }
 
 // ─── Overall verdict ──────────────────────────────────────────────────────────
+// Shared metric computation — single source of truth for both verdict functions.
+function _verdictMetrics(results) {
+  const effective    = results.map(r => ({ ...r, effStatus: r.override ?? r.status }));
+  const total        = effective.length;
+  const highMissing  = effective.filter(r => r.criticality_norm === 'HIGH' && r.effStatus === 'MISSING');
+  // "Absent" = HIGH MISSING with no near-match evidence at all — contract is silent on this obligation.
+  const highAbsent   = highMissing.filter(r => !r.evidence || r.evidence.length === 0);
+  // Weighted score: COVERED = 1.0 pt, PARTIAL = 0.5 pt, MISSING = 0 pt.
+  // Prevents "60 PARTIAL + 20 COVERED" from scoring identically to "80 COVERED".
+  const weighted     = total > 0
+    ? effective.reduce((s, r) =>
+        s + (r.effStatus === 'COVERED' ? 1.0 : r.effStatus === 'PARTIAL' ? 0.5 : 0.0), 0
+      ) / total
+    : 0;
+  return { effective, total, highMissing, highAbsent, weighted };
+}
+
 function computeVerdict(results) {
-  const effective = results.map(r => ({ ...r, effStatus: r.override ?? r.status }));
-  const highMissing = effective.filter(r => r.criticality_norm === 'HIGH' && r.effStatus === 'MISSING');
-  if (highMissing.length > 0) return 'REJECT AND RENEGOTIATE';
-  const covered = effective.filter(r => r.effStatus !== 'MISSING').length;
-  const pct = effective.length > 0 ? covered / effective.length : 0;
-  if (pct >= 0.80) return 'ACCEPTABLE';
-  if (pct >= 0.60) return 'NEEDS NEGOTIATION';
+  const { highMissing, highAbsent, weighted } = _verdictMetrics(results);
+  // Any HIGH task completely absent from contract (no near-match language at all) → reject.
+  if (highAbsent.length >= 1)   return 'REJECT AND RENEGOTIATE';
+  // 3+ HIGH tasks missing even with some near-match → reject.
+  if (highMissing.length >= 3)  return 'REJECT AND RENEGOTIATE';
+  if (weighted >= 0.80)         return 'ACCEPTABLE';
+  if (weighted >= 0.60)         return 'NEEDS NEGOTIATION';
   return 'REJECT AND RENEGOTIATE';
 }
 
 // Returns the specific reason behind the verdict — used for accurate descriptions.
 function verdictReason(results) {
-  const effective = results.map(r => ({ ...r, effStatus: r.override ?? r.status }));
-  const highMissing = effective.filter(r => r.criticality_norm === 'HIGH' && r.effStatus === 'MISSING');
-  if (highMissing.length > 0) return 'high_missing';
-  const covered = effective.filter(r => r.effStatus !== 'MISSING').length;
-  const pct = effective.length > 0 ? covered / effective.length : 0;
-  if (pct >= 0.80) return 'acceptable';
-  if (pct >= 0.60) return 'needs_negotiation';
+  const { highMissing, highAbsent, weighted } = _verdictMetrics(results);
+  if (highAbsent.length  >= 1)  return 'high_missing_absent';
+  if (highMissing.length >= 3)  return 'high_missing_multiple';
+  if (weighted >= 0.80)         return 'acceptable';
+  if (weighted >= 0.60)         return 'needs_negotiation';
   return 'low_coverage';
 }
 
@@ -2025,6 +2131,12 @@ let currentOwnerFilter = 'subcontractor'; // default: score subcontractor tasks 
 function ownerFilteredResults() {
   if (currentOwnerFilter === 'all') return allResults;
   return allResults.filter(r => r.owner === currentOwnerFilter);
+}
+
+// Results used for verdict and KPI — owner-filtered AND in-scope only.
+// Out-of-scope refs are displayed but don't count against the verdict.
+function inScopeResults() {
+  return ownerFilteredResults().filter(r => r.scope_status !== 'out_of_scope');
 }
 
 // ─── LLM result cache (localStorage) ─────────────────────────────────────────
@@ -2637,6 +2749,49 @@ function sortTable(tbody, colIdx) {
   rows.forEach(r => tbody.appendChild(r));
 }
 
+// ─── Auto-scope detection ─────────────────────────────────────────────────────
+// For each active schedule ref, check whether any of its title-level tokens
+// appear anywhere in the contract. Refs with zero presence are flagged
+// 'out_of_scope' — their tasks are shown but excluded from the verdict.
+// A cited ref (_refCited) is always in scope regardless of token presence.
+function computeRefScope(contractText, allRefs) {
+  const contractToks = new Set(tokeniseBase(contractText));
+  const result = {};
+  for (const ref of allRefs) {
+    const tasks = tasksByRef[ref] || [];
+    if (!tasks.length) { result[ref] = 'in_scope'; continue; }
+    const schedTitle = tasks[0].schedule_title || '';
+    const titleToks  = tokeniseBase(schedTitle);
+    // Remove words that appear in every schedule title within a family —
+    // both universal maintenance words and family-level domain prefix words.
+    // Family-level words must be removed so discriminating tokens are the
+    // per-ref specific ones, not the shared domain prefix.
+    const SCOPE_STOP = new Set([
+      // Universal maintenance / scheduling words
+      'inspection','testing','service','maintenance','general','periodic',
+      'routine','annual','monthly','weekly','quarterly','systems','system',
+      'units','unit','plant','equipment','installation','associated','related',
+      // Family-level domain prefix words (appear in every sibling's schedule title)
+      'smoke','generator','generators','genset',
+      'lighting','distribution','switchgear',
+      'earthing','bonding',
+      'pump','pumps','pumping',
+      'dehumidification','dehumidifier',
+      'hvac','ventilation','air',
+      'electrical','electric',
+      'water','hydraulic',
+      // Cross-family connector word — appears in "Smoke Control -" prefix of
+      // every smoke_control schedule; removing it leaves per-ref specific tokens
+      // (msvs, dampers, scd, pressure, differential, car, park, etc.)
+      'control',
+    ]);
+    const discriminating = titleToks.filter(t => !SCOPE_STOP.has(t) && t.length > 2);
+    if (!discriminating.length) { result[ref] = 'in_scope'; continue; }
+    result[ref] = discriminating.some(t => contractToks.has(t)) ? 'in_scope' : 'out_of_scope';
+  }
+  return result;
+}
+
 // ─── Main engine run ──────────────────────────────────────────────────────────
 document.getElementById('runBtn').addEventListener('click', runCheck);
 
@@ -2659,12 +2814,29 @@ function runCheck() {
   //   checks are legitimate subcontractor PPM obligations (see 43-02 et al).
   const EXCLUDED_FREQS = new Set(['0U', '1D']);
 
+  // ── Schedule-reference detection ──────────────────────────────────────────
+  // Only treat a ref as explicitly cited if it's an active ref in this system key.
+  // This prevents date fragments (01-03) and document section numbers from
+  // triggering false auto-COVERED verdicts.
+  const REF_PATTERN  = /\b(\d{2}-\d{2}(?:-\d{2})?|HTM\s*0[0-9]-\d{2})\b/gi;
+  const activeRefSet = new Set(allRefs);
+  const citedRefs    = new Set(
+    [...contractText.matchAll(REF_PATTERN)]
+      .map(m => m[1].replace(/\s+/g, ' ').trim())
+      .filter(r => activeRefSet.has(r))
+  );
+
+  // ── Auto-scope detection ───────────────────────────────────────────────────
+  const scopeMap = computeRefScope(contractText, allRefs);
+
   const systemTasks = [];
   for (const ref of allRefs) {
-    const refOwner = getRefOwner(refs, ref);
+    const refOwner   = getRefOwner(refs, ref);
+    const refCited   = citedRefs.has(ref);
+    const scopeStatus = refCited ? 'in_scope' : (scopeMap[ref] || 'in_scope');
     for (const t of (tasksByRef[ref] || [])) {
       if (!t.withdrawn && !EXCLUDED_FREQS.has(t.frequency)) {
-        systemTasks.push({ ...t, _owner: refOwner });
+        systemTasks.push({ ...t, _owner: refOwner, _refCited: refCited, _scopeStatus: scopeStatus });
       }
     }
   }
@@ -2713,7 +2885,7 @@ function verdictClass(v) {
 }
 
 function buildSummaryHTML(freqHits) {
-  const filtered   = ownerFilteredResults();
+  const filtered   = inScopeResults();
   const totalTasks = filtered.length;
   const covCount   = filtered.filter(r => effectiveStatus(r) === 'COVERED').length;
   const parCount   = filtered.filter(r => effectiveStatus(r) === 'PARTIAL').length;
@@ -2738,6 +2910,11 @@ function buildSummaryHTML(freqHits) {
   const iconTasks  = { bg: '#e8f3fb', fg: '#1a6b8a' };
   const iconCov    = { bg: '#dcfce7', fg: '#16a34a' };
   const iconGaps   = highMiss.length > 0 ? { bg: '#fee2e2', fg: '#dc2626' } : { bg: '#dcfce7', fg: '#16a34a' };
+
+  // Out-of-scope ref count for notice
+  const outOfScopeRefs = [...new Set(
+    ownerFilteredResults().filter(r => r.scope_status === 'out_of_scope').map(r => r.schedule_ref)
+  )];
 
   const critRows = ['HIGH','MEDIUM','LOW'].map(key => {
     const col = key === 'HIGH' ? '#dc2626' : key === 'MEDIUM' ? '#d97706' : '#16a34a';
@@ -2811,14 +2988,19 @@ function buildSummaryHTML(freqHits) {
           <div class="dash-detail-lbl">By criticality</div>
           <div class="dash-crit-wrap">${critRows}</div>
         </div>
-        <div><span class="dash-freq-chip">🕐 ${escHtml(freqStr)}</span></div>
+        <div>
+          <span class="dash-freq-chip">🕐 ${escHtml(freqStr)}</span>
+          ${outOfScopeRefs.length > 0
+            ? `<span class="scope-notice">⊘ ${outOfScopeRefs.length} ref${outOfScopeRefs.length > 1 ? 's' : ''} likely out of scope — excluded from scoring</span>`
+            : ''}
+        </div>
       </div>
     </div>
   </div>`;
 }
 
 function animateDashboard() {
-  const filtered = ownerFilteredResults();
+  const filtered = inScopeResults();
   const total    = filtered.length;
   if (!total) return;
   const covN     = filtered.filter(r => effectiveStatus(r) === 'COVERED').length;
@@ -2939,13 +3121,16 @@ function buildScheduleSection(ref, tasks) {
   const title    = tasks[0].schedule_title || ref;
   const source   = tasks[0].source || '';
 
+  const isOutOfScope = tasks.length > 0 && tasks[0].scope_status === 'out_of_scope';
+
   const section = document.createElement('div');
-  section.className = 'schedule-section';
+  section.className = 'schedule-section' + (isOutOfScope ? ' out-of-scope' : '');
 
   const nTotal = tasks.length;
   const hasCritMissing = tasks.some(r => r.criticality_norm === 'HIGH' && effectiveStatus(r) === 'MISSING');
   const hasMissing     = tasks.some(r => effectiveStatus(r) === 'MISSING');
-  const accentColor    = hasCritMissing ? '#ef4444' : hasMissing ? '#f59e0b' : '#22c55e';
+  const accentColor    = isOutOfScope ? '#94a3b8'
+    : hasCritMissing ? '#ef4444' : hasMissing ? '#f59e0b' : '#22c55e';
   section.style.borderLeft = `3px solid ${accentColor}`;
   section.style.borderRadius = '12px';
 
@@ -2960,7 +3145,7 @@ function buildScheduleSection(ref, tasks) {
   header.setAttribute('role', 'button');
   header.setAttribute('aria-expanded', 'false');
   header.innerHTML =
-    `<span class="schedule-header-left">${escHtml(ref)} — ${escHtml(title)} <small style="font-weight:normal;color:#888">(${source})</small></span>
+    `<span class="schedule-header-left">${escHtml(ref)} — ${escHtml(title)} <small style="font-weight:normal;color:#888">(${source})</small>${isOutOfScope ? ' <span class="scope-badge">out of scope</span>' : ''}</span>
      <span class="schedule-header-right">
        ${miniBar}
        <span class="schedule-badge badge-covered">${nCovered} covered</span>
@@ -3014,7 +3199,9 @@ function buildScheduleSection(ref, tasks) {
                        r.freq_status === 'NON_COMPLIANT' ? '✗ Too low' : '— Unknown';
 
     const evidenceBtn = r.evidence && r.evidence.length > 0
-      ? `<button class="evidence-btn" onclick="toggleEvidence(this)" aria-expanded="false">▶ evidence</button>`
+      ? `<button class="evidence-btn" onclick="toggleEvidence(this)" aria-expanded="false">${
+          eff === 'MISSING' ? '▶ nearest' : '▶ evidence'
+        }</button>`
       : '';
 
     tr.innerHTML = `
@@ -3024,7 +3211,11 @@ function buildScheduleSection(ref, tasks) {
       <td class="${critClass}">${escHtml(r.criticality_norm || '—')}</td>
       <td>${escHtml(r.skill_required || '—')}</td>
       <td aria-label="Task: ${escAttr(r.title)} — Status: ${eff}"><span class="status-icon">${statusIcon}</span>${eff}</td>
-      <td><span class="conf-badge">${r.confidence}%</span></td>
+      <td><span class="${
+          eff === 'PARTIAL' && r.confidence >= 40 ? 'conf-badge conf-badge-near' :
+          eff === 'PARTIAL'                        ? 'conf-badge conf-badge-weak' :
+                                                     'conf-badge'
+        }">${r.confidence}%</span></td>
       <td class="${freqClass}">${freqLabel}</td>
       <td>
         <select class="override-select"
@@ -3043,10 +3234,18 @@ function buildScheduleSection(ref, tasks) {
       const evRow = document.createElement('tr');
       evRow.className = 'evidence-row';
       evRow.style.display = 'none';
-      const snippets = r.evidence
-        .map(e => `<div class="evidence-snippet">${highlightEvidence(e.text, e.matchedTokens)}</div>`)
-        .join('');
-      evRow.innerHTML = `<td colspan="9"><div class="evidence-panel">${snippets}</div></td>`;
+      const isMissing = eff === 'MISSING';
+      const snippets = r.evidence.map(e => {
+        const negated = isNegatedSentence(e.text, e.matchedTokens);
+        const cls     = negated ? 'evidence-snippet negated' : 'evidence-snippet';
+        const warn    = negated ? '<span class="negation-warn">⚠ may negate</span>' : '';
+        return `<div class="${cls}">${warn}${highlightEvidence(e.text, e.matchedTokens)}</div>`;
+      }).join('');
+      const panelClass = isMissing ? 'evidence-panel evidence-panel-missing' : 'evidence-panel';
+      const label = isMissing
+        ? '<div class="evidence-label">Nearest contract language — below match threshold</div>'
+        : '';
+      evRow.innerHTML = `<td colspan="9"><div class="${panelClass}">${label}${snippets}</div></td>`;
       tbody.appendChild(evRow);
     }
   }
@@ -3155,7 +3354,7 @@ function refreshSummary() {
   bar.dataset.freqHits = JSON.stringify(freqHits);
   animateDashboard();
 
-  const highMissing = ownerFilteredResults().filter(r => r.criticality_norm === 'HIGH' && effectiveStatus(r) === 'MISSING');
+  const highMissing = inScopeResults().filter(r => r.criticality_norm === 'HIGH' && effectiveStatus(r) === 'MISSING');
   if (highMissing.length > 0) {
     document.getElementById('criticalGapsList').innerHTML = highMissing.map(r =>
       `<li class="gap-link" onclick="scrollToTask('${escAttr(r.task_id)}')" title="Click to jump to this task">${r.task_id} — ${escHtml(r.title)} [${r.required_freq || '?'}, ${r.skill_required || '?'}]</li>`
@@ -3183,7 +3382,7 @@ function renderResults(sysKey, freqHits) {
     b.classList.toggle('active', b.dataset.owner === 'subcontractor')
   );
 
-  const highMissing = ownerFilteredResults().filter(r => r.criticality_norm === 'HIGH' && effectiveStatus(r) === 'MISSING');
+  const highMissing = inScopeResults().filter(r => r.criticality_norm === 'HIGH' && effectiveStatus(r) === 'MISSING');
   if (highMissing.length > 0) {
     document.getElementById('criticalGapsList').innerHTML = highMissing.map(r =>
       `<li class="gap-link" onclick="scrollToTask('${escAttr(r.task_id)}')" title="Click to jump to this task">${r.task_id} — ${escHtml(r.title)} [${r.required_freq || '?'}, ${r.skill_required || '?'}]</li>`
@@ -3228,7 +3427,7 @@ function downloadFile(filename, content, mime) {
 }
 
 function exportTxt() {
-  const verdict  = computeVerdict(allResults);
+  const verdict  = computeVerdict(inScopeResults());
   const bar      = document.getElementById('summaryBar');
   const freqHits = JSON.parse(bar.dataset.freqHits || '[]');
   const freqStr  = freqHits.length ? freqHits.map(f => f.label).join(', ') : 'None detected';
@@ -3285,7 +3484,7 @@ function exportJson() {
   const out = {
     generated: new Date().toISOString(),
     ...(qRef ? { contract_ref: qRef } : {}),
-    verdict: computeVerdict(allResults),
+    verdict: computeVerdict(inScopeResults()),
     detected_frequencies: freqHits.map(f => ({ label: f.label, days: f.days })),
     tasks: allResults.map(r => ({ ...r, effective_status: effectiveStatus(r) })),
   };
@@ -3296,11 +3495,11 @@ function exportHtml() {
   const bar       = document.getElementById('summaryBar');
   const freqHits  = JSON.parse(bar.dataset.freqHits || '[]');
   const freqStr   = freqHits.length ? freqHits.map(f => f.label).join(', ') : 'None detected';
-  const verdict   = computeVerdict(allResults);
+  const verdict   = computeVerdict(inScopeResults());
   const sysKey    = document.getElementById('systemSelect').value;
   const sysLabel  = SYSTEM_REFS[sysKey]?.label || sysKey;
-  const total     = allResults.length;
-  const covCount  = allResults.filter(r => effectiveStatus(r) === 'COVERED').length;
+  const total     = inScopeResults().length;
+  const covCount  = inScopeResults().filter(r => effectiveStatus(r) === 'COVERED').length;
   const parCount  = allResults.filter(r => effectiveStatus(r) === 'PARTIAL').length;
   const misCount  = allResults.filter(r => effectiveStatus(r) === 'MISSING').length;
   const highAll   = allResults.filter(r => r.criticality_norm === 'HIGH');
@@ -3312,16 +3511,22 @@ function exportHtml() {
 
   const VERDICT_COLOUR = verdict === 'ACCEPTABLE' ? '#16a34a' : verdict === 'NEEDS NEGOTIATION' ? '#d97706' : '#dc2626';
   const VERDICT_BG     = verdict === 'ACCEPTABLE' ? '#f0fdf4' : verdict === 'NEEDS NEGOTIATION' ? '#fffbeb' : '#fef2f2';
-  const reason = verdictReason(allResults);
+  const reason      = verdictReason(allResults);
+  const weightedPct = total > 0
+    ? Math.round((covCount * 1.0 + parCount * 0.5) / total * 100)
+    : 0;
+  const highAbsentCount   = highMiss.filter(r => !r.evidence || r.evidence.length === 0).length;
   const VERDICT_DESC =
     reason === 'acceptable'
-      ? 'This contract meets the minimum PPM compliance threshold (≥80% coverage, no HIGH severity gaps). Review any PARTIAL items before finalising.'
+      ? `This contract meets the minimum PPM compliance threshold (weighted coverage ${weightedPct}% ≥ 80%). PARTIAL tasks count as half-credit in this score. Review all PARTIAL items before finalising.`
     : reason === 'needs_negotiation'
-      ? `This contract has ${covPct}% coverage, below the 80% acceptable threshold. Coverage gaps must be addressed before acceptance — negotiate the highlighted PARTIAL and MISSING items.`
-    : reason === 'high_missing'
-      ? `This contract leaves ${highMiss.length} HIGH severity task${highMiss.length > 1 ? 's' : ''} completely unevidenced. These are mandatory compliance items that must be explicitly covered before this contract can be accepted.`
+      ? `This contract has a weighted coverage score of ${weightedPct}% (below the 80% threshold — PARTIAL tasks count as half-credit). Negotiate the highlighted PARTIAL and MISSING items before acceptance.`
+    : reason === 'high_missing_absent'
+      ? `This contract leaves ${highAbsentCount} HIGH severity task${highAbsentCount > 1 ? 's' : ''} with no related contract language at all. These obligations must be explicitly added before this contract can be accepted.`
+    : reason === 'high_missing_multiple'
+      ? `This contract has ${highMiss.length} HIGH severity tasks unresolved (MISSING). Even where near-match language exists, the obligation is not clearly evidenced. These must be explicitly covered before acceptance.`
     : /* low_coverage */
-      `This contract covers only ${covPct}% of required maintenance tasks — below the minimum 60% threshold. Overall scope is insufficient and must be significantly expanded before acceptance.`;
+      `This contract has a weighted coverage score of ${weightedPct}% — below the minimum 60% threshold. Overall scope is insufficient and must be significantly expanded before acceptance.`;
 
   const statusIcon = s => s === 'COVERED' ? '✅' : s === 'PARTIAL' ? '⚠️' : '❌';
   const statusCol  = s => s === 'COVERED' ? '#16a34a' : s === 'PARTIAL' ? '#d97706' : '#dc2626';
