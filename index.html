@@ -4316,17 +4316,21 @@ function exportHtml() {
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#dc2626;text-align:center">${f.nonCompliant > 0 ? '❌ ' + f.nonCompliant + ' tasks' : '—'}</td>
     </tr>`).join('');
 
-  // Build schedule sections (profile-excluded schedules omitted)
-  const grouped = groupByRef(exportScope);
-  const scheduleSections = Object.entries(grouped).map(([ref, tasks]) => {
+  // Build schedule sections — in-scope first, then out-of-scope collapsed block
+  const inScopeExport    = exportScope.filter(r => r.scope_status !== 'out_of_scope');
+  const outOfScopeExport = exportScope.filter(r => r.scope_status === 'out_of_scope');
+  const outOfScopeRefs   = [...new Set(outOfScopeExport.map(r => r.schedule_ref))];
+
+  function buildExportScheduleSection(ref, tasks) {
     const src        = tasks[0].source;
     const title      = tasks[0].schedule_title;
     const sCov       = tasks.filter(t => effectiveStatus(t) === 'COVERED').length;
     const sPar       = tasks.filter(t => effectiveStatus(t) === 'PARTIAL').length;
     const sMis       = tasks.filter(t => effectiveStatus(t) === 'MISSING').length;
-    const sHasCrit   = tasks.some(t => t.criticality_norm === 'HIGH' && effectiveStatus(t) === 'MISSING');
-    const headerBg   = sHasCrit ? '#fef2f2' : '#f8fafc';
-    const headerBdr  = sHasCrit ? '#fca5a5' : '#e2e8f0';
+    const isOOS      = tasks[0].scope_status === 'out_of_scope';
+    const sHasCrit   = !isOOS && tasks.some(t => t.criticality_norm === 'HIGH' && effectiveStatus(t) === 'MISSING');
+    const headerBg   = isOOS ? '#f8fafc' : sHasCrit ? '#fef2f2' : '#f8fafc';
+    const headerBdr  = isOOS ? '#e2e8f0' : sHasCrit ? '#fca5a5' : '#e2e8f0';
     const taskRows   = tasks.map(t => {
       const eff = effectiveStatus(t);
       const evidenceRow = t.evidence && t.evidence.length > 0 ? `
@@ -4359,14 +4363,16 @@ function exportHtml() {
           <span style="color:#64748b;font-size:13px;margin-left:8px">${escHtml(title)}</span>
           <span style="font-size:11px;color:#94a3b8;margin-left:6px">(${escHtml(src)})</span>
         </div>
-        <div style="display:flex;gap:8px;font-size:12px;font-weight:600">
-          ${sCov ? `<span style="background:#dcfce7;color:#16a34a;padding:3px 8px;border-radius:12px">✅ ${sCov} covered</span>` : ''}
-          ${sPar ? `<span style="background:#fef9c3;color:#d97706;padding:3px 8px;border-radius:12px">⚠️ ${sPar} partial</span>` : ''}
-          ${sMis ? `<span style="background:#fee2e2;color:#dc2626;padding:3px 8px;border-radius:12px">❌ ${sMis} missing</span>` : ''}
+        <div style="display:flex;gap:8px;font-size:12px;font-weight:600;flex-wrap:wrap;align-items:center">
+          ${isOOS ? `<span style="background:#f1f5f9;color:#64748b;padding:3px 10px;border-radius:12px;font-size:11px">⊘ Out of scope — excluded from scoring</span>` : ''}
+          ${!isOOS && sCov ? `<span style="background:#dcfce7;color:#16a34a;padding:3px 8px;border-radius:12px">✅ ${sCov} covered</span>` : ''}
+          ${!isOOS && sPar ? `<span style="background:#fef9c3;color:#d97706;padding:3px 8px;border-radius:12px">⚠️ ${sPar} partial</span>` : ''}
+          ${!isOOS && sMis ? `<span style="background:#fee2e2;color:#dc2626;padding:3px 8px;border-radius:12px">❌ ${sMis} missing</span>` : ''}
         </div>
       </div>
+      ${isOOS ? `<div style="padding:8px 16px;background:#f8fafc;font-size:12px;color:#94a3b8;border-bottom:1px solid #e2e8f0">This schedule was not detected in the contract scope and is excluded from the compliance verdict.</div>` : ''}
       <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-family:system-ui,sans-serif">
+        <table style="width:100%;border-collapse:collapse;font-family:system-ui,sans-serif;${isOOS ? 'opacity:0.6' : ''}">
           <thead>
             <tr style="background:#f1f5f9;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.04em">
               <th style="padding:8px 10px;text-align:left;font-weight:600">Task ID</th>
@@ -4383,7 +4389,23 @@ function exportHtml() {
         </table>
       </div>
     </div>`;
-  }).join('');
+  }
+
+  const grouped          = groupByRef(inScopeExport);
+  const groupedOOS       = groupByRef(outOfScopeExport);
+  const inScopeSections  = Object.entries(grouped).map(([ref, tasks]) => buildExportScheduleSection(ref, tasks)).join('');
+  const oosSections      = outOfScopeRefs.length > 0
+    ? `<details style="margin-top:20px">
+        <summary style="cursor:pointer;font-size:13px;color:#64748b;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;list-style:none;display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px">⊘</span>
+          <span><strong>${outOfScopeRefs.length} schedule${outOfScopeRefs.length > 1 ? 's' : ''} excluded — not detected in contract scope</strong> <span style="font-weight:400">(${outOfScopeRefs.join(', ')})</span></span>
+        </summary>
+        <div style="margin-top:12px">
+          ${Object.entries(groupedOOS).map(([ref, tasks]) => buildExportScheduleSection(ref, tasks)).join('')}
+        </div>
+      </details>`
+    : '';
+  const scheduleSections = inScopeSections + oosSections;
 
   // Critical gaps panel
   const critGapsHtml = highMiss.length > 0 ? `
@@ -4548,8 +4570,11 @@ function exportHtml() {
           </div>`;
         }).join('')}
       </div>
-      <!-- Freq chip -->
-      <div><span style="font-size:10px;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:2px 9px">🕐 ${escHtml(freqStr)}</span></div>
+      <!-- Freq chip + out-of-scope notice -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:10px;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:2px 9px">🕐 ${escHtml(freqStr)}</span>
+        ${outOfScopeRefs.length > 0 ? `<span style="font-size:10px;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:2px 9px">⊘ ${outOfScopeRefs.length} ref${outOfScopeRefs.length > 1 ? 's' : ''} out of scope — excluded from scoring</span>` : ''}
+      </div>
     </div>
   </div>
   <script>
