@@ -754,10 +754,11 @@
   /* ── LLM score delta ticker ── */
   .llm-score-delta { display:flex; align-items:center; gap:6px; font-size:12px;
                      background:#f5f3ff; border-radius:7px; padding:5px 12px;
-                     margin-bottom:4px; font-variant-numeric:tabular-nums; }
-  .llm-score-base  { color:#94a3b8; font-weight:400; }
-  .llm-score-sep   { color:#c4b5fd; }
-  .llm-score-live  { color:#4f46e5; font-weight:700; transition:color .4s; }
+                     margin-bottom:4px; font-variant-numeric:tabular-nums;
+                     flex-wrap:wrap; row-gap:3px; }
+  .llm-score-base  { color:#94a3b8; font-weight:400; white-space:nowrap; }
+  .llm-score-sep   { color:#c4b5fd; flex-shrink:0; }
+  .llm-score-live  { color:#4f46e5; font-weight:700; transition:color .4s; white-space:nowrap; flex-shrink:0; }
   .llm-score-live.improved { color:#16a34a; }
   .llm-score-delta-tag { font-size:10px; color:#6366f1; background:#ede9fe;
                          border-radius:4px; padding:1px 6px; margin-left:2px;
@@ -2142,13 +2143,13 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null, i
   upgradeCountEl.style.display = 'none';
   upgradeCountEl.textContent   = '';
 
-  // Score delta ticker — show baseline, live slot starts equal
+  // Score delta ticker — show baseline only until AI actually changes something
   if (scoreDeltaEl) {
     scoreDeltaEl.style.display = '';
     scoreDeltaEl.innerHTML =
-      `<span class="llm-score-base">Keyword ${baselineWeighted}%</span>`
-    + `<span class="llm-score-sep">→</span>`
-    + `<span id="llmScoreLive" class="llm-score-live">${baselineWeighted}%</span>`
+      `<span class="llm-score-base">Coverage before AI: <b>${baselineWeighted}%</b></span>`
+    + `<span class="llm-score-sep" id="llmScoreSep" style="display:none">→</span>`
+    + `<span id="llmScoreLive" class="llm-score-live" style="display:none"></span>`
     + `<span id="llmScoreDeltaTag" class="llm-score-delta-tag" style="display:none"></span>`;
   }
 
@@ -2177,14 +2178,21 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null, i
     const par  = isr.filter(r => effectiveStatus(r) === 'PARTIAL').length;
     const live = Math.round((cov + par * 0.5) / t * 100);
     const livEl  = document.getElementById('llmScoreLive');
+    const sepEl  = document.getElementById('llmScoreSep');
     const tagEl  = document.getElementById('llmScoreDeltaTag');
-    if (livEl) {
-      livEl.textContent = live + '%';
-      livEl.className   = 'llm-score-live' + (live > baselineWeighted ? ' improved' : '');
+    if (live !== baselineWeighted) {
+      // Score changed — show arrow + new value
+      if (sepEl) sepEl.style.display = '';
+      if (livEl) {
+        livEl.style.display = '';
+        livEl.textContent   = live + '%';
+        livEl.className     = 'llm-score-live' + (live > baselineWeighted ? ' improved' : '');
+      }
     }
     if (tagEl && upgradedCount > 0) {
       tagEl.style.display = '';
-      tagEl.textContent   = `↑${upgradedCount} upgraded`;
+      const delta = live - baselineWeighted;
+      tagEl.textContent   = delta > 0 ? `↑${upgradedCount} tasks upgraded` : `${upgradedCount} tasks changed`;
       tagEl.className     = 'llm-score-delta-tag' + (live > baselineWeighted ? ' improved' : '');
     }
   }
@@ -2218,6 +2226,7 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null, i
 
   // ── Load from cache — log cached tasks immediately ─────────────────────────
   const uncached = [];
+  let cachedChanged = 0;
   for (const result of candidates) {
     const cached = !ignoreCache && llmCache.get(result.task_id, cHash);
     if (cached) {
@@ -2233,6 +2242,7 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null, i
           resultObj.llm_data = cached;
         }
         applyLlmAutoResult(result.task_id, cached.status, cached.reasoning, cached.key_sentences);
+        cachedChanged++;
       }
       addLogEntry(result.task_id, 'llm-log-cached', '○', result.title,
                   `${cached.status}  (cached)`);
@@ -2395,6 +2405,29 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null, i
   progressEl.textContent = upgraded > 0
     ? `AI review complete — ${upgraded} ${changeWord} applied · ${totalTime}`
     : `AI review complete — no changes · ${totalTime}`;
+
+  // Update score delta to final state
+  if (scoreDeltaEl) {
+    const isr        = inScopeResults();
+    const t          = isr.length;
+    const cov        = isr.filter(r => effectiveStatus(r) === 'COVERED').length;
+    const par        = isr.filter(r => effectiveStatus(r) === 'PARTIAL').length;
+    const finalScore = t ? Math.round((cov + par * 0.5) / t * 100) : baselineWeighted;
+    const totalChanged = upgraded + cachedChanged;
+    if (finalScore === baselineWeighted) {
+      scoreDeltaEl.innerHTML =
+        `<span class="llm-score-base">Coverage <b>${finalScore}%</b></span>`
+      + `<span class="llm-score-delta-tag">AI reviewed · no change</span>`;
+    } else {
+      const improved = finalScore > baselineWeighted;
+      const taskWord = totalChanged !== 1 ? 'tasks' : 'task';
+      scoreDeltaEl.innerHTML =
+        `<span class="llm-score-base">Coverage <b>${baselineWeighted}%</b></span>`
+      + `<span class="llm-score-sep">→</span>`
+      + `<span class="llm-score-live ${improved ? 'improved' : ''}">${finalScore}%</span>`
+      + `<span class="llm-score-delta-tag ${improved ? 'improved' : ''}">${totalChanged} ${taskWord} revised</span>`;
+    }
+  }
   btn.disabled = false;
   if (freshBtn) freshBtn.disabled = false;
   _llmRunning = false;
