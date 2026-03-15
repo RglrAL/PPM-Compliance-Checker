@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+a<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4644,18 +4644,32 @@ function exportHtml() {
       </thead>
       <tbody>${freqTableRows}</tbody>
     </table>
-    ${freqRiskTasks.length > 0 ? `
+    ${freqRiskTasks.length > 0 ? (() => {
+      const freqRiskNamed = freqRiskTasks.filter(r => r.criticality_norm === 'HIGH' || r.criticality_norm === 'MEDIUM');
+      const freqRiskLow   = freqRiskTasks.filter(r => r.criticality_norm !== 'HIGH' && r.criticality_norm !== 'MEDIUM');
+      const headColor     = freqRiskHigh.length > 0 ? '#dc2626' : '#d97706';
+      const lowGroups     = freqRiskLow.reduce((acc, r) => {
+        const k = r.required_freq || '?';
+        acc[k] = (acc[k] || 0) + 1;
+        return acc;
+      }, {});
+      const lowLines = Object.entries(lowGroups).map(([freq, cnt]) =>
+        `<div style="font-size:12px;color:#64748b;padding:3px 0">Plus ${cnt} LOW criticality task${cnt !== 1 ? 's' : ''} requiring ${escHtml(freq)} maintenance not covered by the contract.</div>`
+      ).join('');
+      return `
     <div style="margin-top:16px;border-top:1px solid #f1f5f9;padding-top:14px">
-      <div style="font-size:12px;font-weight:700;color:${freqRiskHigh.length > 0 ? '#dc2626' : '#d97706'};margin-bottom:8px">
-        ${freqRiskHigh.length > 0 ? '⚠️ Frequency risk — HIGH criticality tasks covered but at insufficient frequency:' : '⚠️ Frequency risk — tasks covered but at insufficient frequency:'}
+      <div style="font-size:12px;font-weight:700;color:${headColor};margin-bottom:8px">
+        ⚠️ Frequency risk — tasks covered but at insufficient frequency:
       </div>
-      ${freqRiskTasks.map(r => `
+      ${freqRiskNamed.map(r => `
       <div style="display:flex;gap:10px;align-items:baseline;font-size:12px;padding:4px 0;border-bottom:1px solid #f8fafc">
-        <span style="color:${r.criticality_norm === 'HIGH' ? '#dc2626' : '#d97706'};font-weight:700;white-space:nowrap;min-width:48px">${escHtml(r.criticality_norm || '—')}</span>
+        <span style="color:${r.criticality_norm === 'HIGH' ? '#dc2626' : '#d97706'};font-weight:700;white-space:nowrap;min-width:54px">${escHtml(r.criticality_norm || '—')}</span>
         <span style="color:#0f172a">${escHtml(r.task_id)} — ${escHtml(r.title)}</span>
         <span style="color:#94a3b8;white-space:nowrap;margin-left:auto">requires ${escHtml(r.required_freq || '?')}</span>
       </div>`).join('')}
-    </div>` : ''}
+      ${lowLines}
+    </div>`;
+    })() : ''}
   </div>` : ''}
 
   <!-- Schedule breakdown -->
