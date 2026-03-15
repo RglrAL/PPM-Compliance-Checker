@@ -2226,7 +2226,7 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null, i
                   : item.reasoning;
                 const sub = document.createElement('div');
                 sub.className   = 'llm-log-reasoning';
-                sub.textContent = '"' + snippet + '"';
+                sub.textContent = snippet;
                 const entry = taskLogMap[r.task_id];
                 if (entry) entry.after(sub);
               }
