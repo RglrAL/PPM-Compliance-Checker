@@ -4309,11 +4309,17 @@ function exportHtml() {
       else                                         freqReqs[r.required_freq].unknown++;
     }
   }
+  // Tasks that are COVERED/PARTIAL but frequency is non-compliant — a hidden risk
+  const freqRiskTasks = inScope.filter(r =>
+    effectiveStatus(r) !== 'MISSING' && r.freq_status === 'NON_COMPLIANT'
+  );
+  const freqRiskHigh = freqRiskTasks.filter(r => r.criticality_norm === 'HIGH');
+
   const freqTableRows = Object.values(freqReqs).map(f => `
     <tr>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600">${escHtml(f.label)}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#16a34a;text-align:center">${f.compliant > 0 ? '✅ ' + f.compliant + ' tasks' : '—'}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#dc2626;text-align:center">${f.nonCompliant > 0 ? '❌ ' + f.nonCompliant + ' tasks' : '—'}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#16a34a;text-align:center">${f.compliant > 0 ? '✅ ' + f.compliant + ' task' + (f.compliant !== 1 ? 's' : '') : '—'}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#dc2626;text-align:center">${f.nonCompliant > 0 ? '❌ ' + f.nonCompliant + ' task' + (f.nonCompliant !== 1 ? 's' : '') : '—'}</td>
     </tr>`).join('');
 
   // Build schedule sections — in-scope first, then out-of-scope collapsed block
@@ -4624,6 +4630,18 @@ function exportHtml() {
       </thead>
       <tbody>${freqTableRows}</tbody>
     </table>
+    ${freqRiskTasks.length > 0 ? `
+    <div style="margin-top:16px;border-top:1px solid #f1f5f9;padding-top:14px">
+      <div style="font-size:12px;font-weight:700;color:${freqRiskHigh.length > 0 ? '#dc2626' : '#d97706'};margin-bottom:8px">
+        ${freqRiskHigh.length > 0 ? '⚠️ Frequency risk — HIGH criticality tasks covered but at insufficient frequency:' : '⚠️ Frequency risk — tasks covered but at insufficient frequency:'}
+      </div>
+      ${freqRiskTasks.map(r => `
+      <div style="display:flex;gap:10px;align-items:baseline;font-size:12px;padding:4px 0;border-bottom:1px solid #f8fafc">
+        <span style="color:${r.criticality_norm === 'HIGH' ? '#dc2626' : '#d97706'};font-weight:700;white-space:nowrap;min-width:48px">${escHtml(r.criticality_norm || '—')}</span>
+        <span style="color:#0f172a">${escHtml(r.task_id)} — ${escHtml(r.title)}</span>
+        <span style="color:#94a3b8;white-space:nowrap;margin-left:auto">requires ${escHtml(r.required_freq || '?')}</span>
+      </div>`).join('')}
+    </div>` : ''}
   </div>` : ''}
 
   <!-- Schedule breakdown -->
