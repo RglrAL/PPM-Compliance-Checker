@@ -4121,9 +4121,11 @@ function applyOverride(sel) {
   tr.className   = `task-row row-${eff.toLowerCase()}`;
 
   const statusIcon = eff === 'COVERED' ? '✅' : eff === 'PARTIAL' ? '⚠️' : '❌';
-  const statusTd   = tr.cells[5];
-  statusTd.innerHTML = `<span class="status-icon">${statusIcon}</span>${eff}`;
-  statusTd.setAttribute('aria-label', `Task: ${result.title} — Status: ${eff}`);
+  const statusTd   = tr.cells[2];
+  if (statusTd) {
+    statusTd.innerHTML = `<span class="status-icon">${statusIcon}</span>${eff}`;
+    statusTd.setAttribute('aria-label', `Task: ${result.title} — Status: ${eff}`);
+  }
 
   refreshSectionHeader(tr.closest('.schedule-section'));
   refreshSummary();
