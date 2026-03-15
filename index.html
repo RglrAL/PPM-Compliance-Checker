@@ -4000,15 +4000,15 @@ function renderResults(sysKey, freqHits) {
   const refs    = SYSTEM_REFS[sysKey];
   const allRefs = getActiveRefs(sysKey);
 
-  const bar = document.getElementById('summaryBar');
-  bar.innerHTML = buildSummaryHTML(freqHits);
-  bar.dataset.freqHits = JSON.stringify(freqHits);
-
-  // Reset owner filter to default on each new check
+  // Reset owner filter before building summary so scores use correct filter
   currentOwnerFilter = 'subcontractor';
   document.querySelectorAll('.owner-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.owner === 'subcontractor')
   );
+
+  const bar = document.getElementById('summaryBar');
+  bar.innerHTML = buildSummaryHTML(freqHits);
+  bar.dataset.freqHits = JSON.stringify(freqHits);
 
   const highMissing = inScopeResults().filter(r => r.criticality_norm === 'HIGH' && effectiveStatus(r) === 'MISSING');
   if (highMissing.length > 0) {
