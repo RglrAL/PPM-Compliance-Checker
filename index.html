@@ -4282,7 +4282,12 @@ function downloadFile(filename, content, mime) {
 
 function exportTxt() {
   const exportScope = allResults.filter(r => r.scope_status !== 'profile_excluded');
-  const verdict  = computeVerdict(inScopeResults());
+  const inScope     = allResults.filter(r => r.scope_status !== 'out_of_scope' && r.scope_status !== 'profile_excluded');
+  const verdict     = inScope.length === 0 ? 'UNSCORED' : computeVerdict(inScope);
+  const total       = inScope.length;
+  const covCount    = inScope.filter(r => effectiveStatus(r) === 'COVERED').length;
+  const parCount    = inScope.filter(r => effectiveStatus(r) === 'PARTIAL').length;
+  const weightedPct = total > 0 ? Math.round((covCount + parCount * 0.5) / total * 100) : 0;
   const bar      = document.getElementById('summaryBar');
   const freqHits = JSON.parse(bar.dataset.freqHits || '[]');
   const freqStr  = freqHits.length ? freqHits.map(f => f.label).join(', ') : 'None detected';
@@ -4290,9 +4295,10 @@ function exportTxt() {
   const lines = [
     'PPM COMPLIANCE CHECKER — AUDIT REPORT',
     '======================================',
-    `Generated:           ${new Date().toISOString()}`,
+    `Generated:            ${new Date().toISOString()}`,
     ...(qRef ? [`Contract / Quote ref: ${qRef}`] : []),
-    `Verdict:             ${verdict}`,
+    `Verdict:              ${verdict}`,
+    `Weighted coverage:    ${total > 0 ? weightedPct + '%' : 'N/A'}`,
     `Detected frequencies: ${freqStr}`,
     '',
   ];
@@ -4301,8 +4307,9 @@ function exportTxt() {
     for (const r of tasks) {
       const eff  = effectiveStatus(r);
       const over = r.override ? ` [override: ${r.override}]` : '';
+      const conf = eff === 'MISSING' ? '—' : r.confidence + '%';
       lines.push(`  [${eff}${over}] ${r.task_id} — ${r.title}`);
-      lines.push(`         Freq: ${r.required_freq || '?'} | Crit: ${r.criticality_norm || '?'} | Skill: ${r.skill_required || '?'} | Confidence: ${r.confidence}% | Freq check: ${r.freq_status}`);
+      lines.push(`         Freq: ${r.required_freq || '?'} | Crit: ${r.criticality_norm || '?'} | Skill: ${r.skill_required || '?'} | Confidence: ${conf} | Freq check: ${r.freq_status}`);
     }
     lines.push('');
   }
@@ -4310,6 +4317,7 @@ function exportTxt() {
 }
 
 function exportCsv() {
+  const exportScope = allResults.filter(r => r.scope_status !== 'profile_excluded');
   const qRef  = getQuoteRef();
   const meta  = [
     [`# PPM Compliance Report — ${new Date().toISOString()}`],
@@ -4317,17 +4325,19 @@ function exportCsv() {
     [],
   ];
   const rows = [['task_id','schedule_ref','schedule_title','source','title','criticality_norm',
-    'safety_flag','frequency','required_days','skill_required','auto_status','override',
-    'effective_status','confidence','freq_status','ai_reasoning']];
-  for (const r of allResults) {
+    'safety_flag','frequency','required_days','skill_required','scope_status','auto_status',
+    'override','effective_status','confidence','freq_status','ai_reasoning']];
+  for (const r of exportScope) {
+    const eff      = effectiveStatus(r);
+    const conf     = eff === 'MISSING' ? '' : String(r.confidence);
     const aiReason = (r.llm_data && r.llm_data.reasoning) ? `"${r.llm_data.reasoning.replace(/"/g,'""')}"` : '';
     rows.push([
       r.task_id, r.schedule_ref, r.schedule_title, r.source,
       `"${(r.title||'').replace(/"/g,'""')}"`,
       r.criticality_norm || '', r.safety_flag ? 'true' : 'false',
       r.required_freq || '', r.required_days || '',
-      r.skill_required || '', r.status, r.override || '',
-      effectiveStatus(r), r.confidence, r.freq_status, aiReason
+      r.skill_required || '', r.scope_status || '', r.status, r.override || '',
+      eff, conf, r.freq_status, aiReason
     ]);
   }
   downloadFile(`${exportFileSlug()}.csv`, [...meta, ...rows].map(r => r.join(',')).join('\n'), 'text/csv');
@@ -4335,13 +4345,20 @@ function exportCsv() {
 
 function exportJson() {
   const exportScope = allResults.filter(r => r.scope_status !== 'profile_excluded');
+  const inScope     = allResults.filter(r => r.scope_status !== 'out_of_scope' && r.scope_status !== 'profile_excluded');
+  const total       = inScope.length;
+  const covCount    = inScope.filter(r => effectiveStatus(r) === 'COVERED').length;
+  const parCount    = inScope.filter(r => effectiveStatus(r) === 'PARTIAL').length;
+  const weightedPct = total > 0 ? Math.round((covCount + parCount * 0.5) / total * 100) : null;
   const bar      = document.getElementById('summaryBar');
   const freqHits = JSON.parse(bar.dataset.freqHits || '[]');
   const qRef  = getQuoteRef();
   const out = {
     generated: new Date().toISOString(),
     ...(qRef ? { contract_ref: qRef } : {}),
-    verdict: computeVerdict(inScopeResults()),
+    verdict:          total === 0 ? 'UNSCORED' : computeVerdict(inScope),
+    weighted_coverage: weightedPct,
+    tasks_in_scope:    total,
     detected_frequencies: freqHits.map(f => ({ label: f.label, days: f.days })),
     tasks: exportScope.map(r => ({ ...r, effective_status: effectiveStatus(r) })),
   };
@@ -4574,7 +4591,7 @@ function exportHtml() {
     .print-btn { display: none !important; }
     body { background: white; }
     .page { padding: 0; max-width: none; }
-    details { open: true; }
+    details > *:not(summary) { display: none !important; }
   }
 </style>
 </head>
