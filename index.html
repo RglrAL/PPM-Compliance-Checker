@@ -392,10 +392,11 @@
   .tool-disclaimer { font-size:11px; color:#92400e; background:#fffbeb; border:1px solid #fcd34d;
                      border-radius:8px; padding:8px 14px; margin-bottom:10px; line-height:1.5; }
   html.dark .tool-disclaimer { background:#292524; border-color:#78350f; color:#fbbf24; }
-  .filter-toolbar { display:flex; align-items:center; gap:7px; padding:10px 14px;
+  .filter-toolbar { display:flex; flex-direction:column; gap:8px; padding:10px 14px;
                     background:white; border-radius:10px; border:1.5px solid #e2e8f0;
-                    margin-bottom:10px; flex-wrap:wrap; }
-  .filter-toolbar-sep { width:1px; height:20px; background:#e2e8f0; flex-shrink:0; }
+                    margin-bottom:10px; }
+  .filter-toolbar-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .filter-toolbar-sep { width:1px; height:18px; background:#e2e8f0; flex-shrink:0; margin:0 2px; }
   .filter-input { flex:1; min-width:160px; padding:6px 10px; border:1.5px solid #e2e8f0;
                   border-radius:7px; font-size:12px; font-family:inherit; color:#334155;
                   transition:border-color .15s; background:white; }
@@ -585,6 +586,11 @@
                     transition:opacity .15s, transform .15s; }
   .llm-review-btn:hover { opacity:.88; transform:translateY(-1px); }
   .llm-review-btn:disabled { background:#94a3b8; cursor:not-allowed; transform:none; }
+  .llm-fresh-btn  { padding:6px 12px; border-radius:8px; border:1.5px solid #c7d2fe; cursor:pointer;
+                    background:transparent; color:#4f46e5; font-size:11px; font-weight:600;
+                    font-family:inherit; transition:background .15s, color .15s; }
+  .llm-fresh-btn:hover { background:#ede9fe; border-color:#a5b4fc; }
+  .llm-fresh-btn:disabled { opacity:.4; cursor:not-allowed; }
   .llm-model-tag { font-size:11px; color:#64748b; background:#f1f5f9;
                    border-radius:5px; padding:3px 8px; }
   .llm-progress  { font-size:11px; color:#4f46e5; }
@@ -779,6 +785,7 @@
 
   /* ── Filters / toolbar ── */
   html.dark .filter-toolbar       { background:#161b22; border-color:#2d3748; }
+  html.dark .filter-toolbar-row  { color:#94a3b8; }
   html.dark .filter-toolbar-sep   { background:#2d3748; }
   html.dark .filter-input         { background:#1e2a3a; border-color:#374151; color:#e2e8f0; }
   html.dark .filter-input:focus   { border-color:#60a5fa; box-shadow:0 0 0 3px rgba(96,165,250,.12); }
@@ -1112,12 +1119,12 @@
   </div>
 
   <!-- ── Site profile strip ── -->
-  <div id="profileStrip" class="profile-strip" style="display:none" aria-label="Site profile configuration">
+  <div id="profileStrip" class="profile-strip" aria-label="Site profile configuration">
     <div class="profile-strip-left">
       <div class="profile-strip-icon" aria-hidden="true">🏢</div>
       <div>
         <div class="profile-strip-title">Site profile</div>
-        <div class="profile-strip-summary" id="profileSummary">Not configured — all schedules included</div>
+        <div class="profile-strip-summary" id="profileSummary">Optional: configure site to exclude irrelevant schedules</div>
       </div>
     </div>
     <button class="profile-strip-btn" id="profileStripBtn" onclick="openProfileModal()">Configure</button>
@@ -1181,20 +1188,24 @@
     </div>
 
     <div class="filter-toolbar" role="toolbar" aria-label="Results filters">
-      <input type="text" id="filterInput" class="filter-input" placeholder="🔍 Search tasks…" aria-label="Filter tasks by title">
-      <div class="filter-toolbar-sep" aria-hidden="true"></div>
-      <span class="owner-filter-label">Scoring:</span>
-      <button class="owner-btn active" data-owner="subcontractor"
-              onclick="setOwnerFilter('subcontractor',this)">Subcontractor</button>
-      <button class="owner-btn" data-owner="electrical_contractor"
-              onclick="setOwnerFilter('electrical_contractor',this)">Electrical</button>
-      <button class="owner-btn" data-owner="all"
-              onclick="setOwnerFilter('all',this)">All</button>
-      <div class="filter-toolbar-sep" aria-hidden="true"></div>
-      <button class="filter-btn active" data-filter="all"     onclick="setFilter('all',this)">All</button>
-      <button class="filter-btn"        data-filter="high"    onclick="setFilter('high',this)">HIGH</button>
-      <button class="filter-btn"        data-filter="missing" onclick="setFilter('missing',this)">Missing</button>
-      <button class="expand-all-btn" id="expandAllBtn" onclick="toggleExpandAll()">Expand all</button>
+      <div class="filter-toolbar-row">
+        <input type="text" id="filterInput" class="filter-input" placeholder="🔍 Search tasks…" aria-label="Filter tasks by title">
+        <button class="expand-all-btn" id="expandAllBtn" onclick="toggleExpandAll()">Expand all</button>
+      </div>
+      <div class="filter-toolbar-row">
+        <span class="owner-filter-label">Scoring:</span>
+        <button class="owner-btn active" data-owner="subcontractor"
+                onclick="setOwnerFilter('subcontractor',this)">Subcontractor</button>
+        <button class="owner-btn" data-owner="electrical_contractor"
+                onclick="setOwnerFilter('electrical_contractor',this)">Electrical</button>
+        <button class="owner-btn" data-owner="all"
+                onclick="setOwnerFilter('all',this)">All tasks</button>
+        <div class="filter-toolbar-sep" aria-hidden="true"></div>
+        <span class="owner-filter-label">Show:</span>
+        <button class="filter-btn active" data-filter="all"     onclick="setFilter('all',this)">All</button>
+        <button class="filter-btn"        data-filter="high"    onclick="setFilter('high',this)">HIGH only</button>
+        <button class="filter-btn"        data-filter="missing" onclick="setFilter('missing',this)">Missing only</button>
+      </div>
     </div>
 
     <!-- LLM unavailability notice (shown when LLM is not available after a check) -->
@@ -1207,6 +1218,7 @@
     <div id="llmReviewBar" class="llm-review-bar slim" style="display:none">
       <div class="llm-bar-top">
         <button id="llmRunBtn" class="llm-review-btn" onclick="runSemanticReview()">✦ Run AI review</button>
+        <button id="llmFreshBtn" class="llm-fresh-btn" onclick="runSemanticReview(false, null, true)" title="Re-run ignoring cached results">↺ Fresh run</button>
         <span class="llm-model-tag"></span>
         <span class="llm-progress" id="llmProgress">Reviews MISSING &amp; PARTIAL tasks using AI</span>
         <button class="llm-slim-toggle" id="llmSlimToggle" onclick="toggleLlmDetails()" style="display:none">Show details</button>
@@ -1916,7 +1928,7 @@ async function checkLlmAvailability() {
   }
 }
 
-async function runSemanticReview(autoTrigger = false, targetCandidates = null) {
+async function runSemanticReview(autoTrigger = false, targetCandidates = null, ignoreCache = false) {
   if (_llmRunning) return;
   _llmRunning = true;
   const btn            = document.getElementById('llmRunBtn');
@@ -1941,6 +1953,8 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null) {
   }
 
   btn.disabled = true;
+  const freshBtn = document.getElementById('llmFreshBtn');
+  if (freshBtn) freshBtn.disabled = true;
 
   const statusRank = { 'MISSING': 0, 'PARTIAL': 1, 'COVERED': 2 };
 
@@ -1984,7 +1998,7 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null) {
   // ── Load from cache — log cached tasks immediately ─────────────────────────
   const uncached = [];
   for (const result of candidates) {
-    const cached = llmCache.get(result.task_id, cHash);
+    const cached = !ignoreCache && llmCache.get(result.task_id, cHash);
     if (cached) {
       const effStatus   = effectiveStatus(result);
       const isUpgrade   = statusRank[cached.status] > statusRank[effStatus];
@@ -2011,6 +2025,7 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null) {
     pbarLabel.textContent = '✓ All cached';
     progressEl.textContent = `All ${candidates.length} tasks loaded from cache instantly.`;
     btn.disabled = false;
+    if (freshBtn) freshBtn.disabled = false;
     _llmRunning = false;
     return;
   }
@@ -2161,6 +2176,7 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null) {
   currentTaskEl.textContent = '';
   progressEl.textContent    = `AI review complete — ${upgraded} change${upgraded !== 1 ? 's' : ''} applied.`;
   btn.disabled = false;
+  if (freshBtn) freshBtn.disabled = false;
   _llmRunning = false;
   refreshSummary();
   applyFilter();
@@ -2321,6 +2337,7 @@ function applyLlmAutoResult(taskId, status, reasoning, keySentences) {
   tr.after(autoRow);
 
   refreshSectionHeader(tr.closest('.schedule-section'));
+  animateDashboard();
 }
 
 function revertLlmResult(taskId) {
@@ -2742,9 +2759,7 @@ function updateProfileStrip(sysKey, bothReady = false) {
   const hasConfig = items.some(i => sysData[i.id] === 'yes' || sysData[i.id] === 'no');
   document.getElementById('profileSummary').textContent = hasConfig
     ? _profileSummaryText(sysKey)
-    : bothReady
-      ? 'Optional — configure to exclude non-applicable schedules'
-      : 'Not configured — all schedules included';
+    : 'Optional: configure site to exclude irrelevant schedules';
   document.getElementById('profileStripBtn').textContent = hasConfig ? 'Edit profile' : 'Configure';
   strip.classList.toggle('profile-strip-prompt', bothReady && !hasConfig);
 }
@@ -3617,7 +3632,20 @@ function buildSummaryHTML(freqHits) {
 function animateDashboard() {
   const filtered = inScopeResults();
   const total    = filtered.length;
-  if (!total) return;
+  if (!total) {
+    // No tasks for this filter — clear stale display rather than leaving old values
+    const pctEl = document.getElementById('donutPct');
+    if (pctEl) pctEl.textContent = '—';
+    const dCov = document.getElementById('donutCovered');
+    const dPar = document.getElementById('donutPartial');
+    const dMis = document.getElementById('donutMissing');
+    [dCov, dPar, dMis].forEach(el => { if (el) { el.style.transition = 'none'; el.style['stroke-dasharray'] = '0 302'; } });
+    ['kpiTotal','kpiCovered','kpiHighGaps'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '—'; });
+    const lc = document.getElementById('legCovN'); if (lc) lc.textContent = '0';
+    const lp = document.getElementById('legParN'); if (lp) lp.textContent = '0';
+    const lm = document.getElementById('legMisN'); if (lm) lm.textContent = '0';
+    return;
+  }
   const covN     = filtered.filter(r => effectiveStatus(r) === 'COVERED').length;
   const parN     = filtered.filter(r => effectiveStatus(r) === 'PARTIAL').length;
   const misN     = filtered.filter(r => effectiveStatus(r) === 'MISSING').length;
