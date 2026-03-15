@@ -1,4 +1,4 @@
-a<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4279,8 +4279,10 @@ function exportHtml() {
   const parW      = total > 0 ? Math.round(parCount  / total * 100) : 0;
   const misW      = total > 0 ? Math.round(misCount  / total * 100) : 0;
 
-  const VERDICT_COLOUR = verdict === 'ACCEPTABLE' ? '#16a34a' : verdict === 'NEEDS NEGOTIATION' ? '#d97706' : '#dc2626';
-  const VERDICT_BG     = verdict === 'ACCEPTABLE' ? '#f0fdf4' : verdict === 'NEEDS NEGOTIATION' ? '#fffbeb' : '#fef2f2';
+  const noScopeMatch = total === 0;
+  const VERDICT_COLOUR = noScopeMatch ? '#64748b' : verdict === 'ACCEPTABLE' ? '#16a34a' : verdict === 'NEEDS NEGOTIATION' ? '#d97706' : '#dc2626';
+  const VERDICT_BG     = noScopeMatch ? '#f8fafc' : verdict === 'ACCEPTABLE' ? '#f0fdf4' : verdict === 'NEEDS NEGOTIATION' ? '#fffbeb' : '#fef2f2';
+  const VERDICT_TEXT   = noScopeMatch ? 'UNSCORED' : verdict;
   const reason      = verdictReason(inScope);
   const weightedPct = total > 0
     ? Math.round((covCount * 1.0 + parCount * 0.5) / total * 100)
@@ -4301,8 +4303,9 @@ function exportHtml() {
     return ` Additionally, ${freqRiskHigh.length} HIGH criticality task${freqRiskHigh.length > 1 ? 's are' : ' is'} covered but at insufficient frequency — the contract must add ${tierStr} maintenance obligations before it can be accepted.`;
   })();
 
-  const VERDICT_DESC =
-    (reason === 'acceptable'
+  const VERDICT_DESC = noScopeMatch
+    ? `No tasks were in scope for this contract — all referenced schedules were excluded from the detected contract scope. A compliance verdict cannot be issued. Review the contract text and confirm the correct maintenance schedules apply to this system.`
+    : (reason === 'acceptable'
       ? `This contract meets the minimum PPM compliance threshold (weighted coverage ${weightedPct}% ≥ 80%). PARTIAL tasks count as half-credit in this score. Review all PARTIAL items before finalising.`
     : reason === 'needs_negotiation'
       ? `This contract has a weighted coverage score of ${weightedPct}% (below the 80% threshold — PARTIAL tasks count as half-credit). Negotiate the highlighted PARTIAL and MISSING items before acceptance.`
@@ -4319,9 +4322,9 @@ function exportHtml() {
   const statusBg   = s => s === 'COVERED' ? '#f0fdf4' : s === 'PARTIAL' ? '#fffbeb' : '#fef2f2';
   const freqIcon   = s => s === 'COMPLIANT' ? '✅' : s === 'NON_COMPLIANT' ? '❌' : '—';
 
-  // Build frequency summary table rows
+  // Build frequency summary table rows (in-scope only — out-of-scope tasks not counted)
   const freqReqs = {};
-  for (const r of exportScope) {
+  for (const r of inScope) {
     if (r.required_freq && r.required_freq !== '?') {
       if (!freqReqs[r.required_freq]) freqReqs[r.required_freq] = { label: r.required_freq, compliant: 0, nonCompliant: 0, unknown: 0 };
       if      (r.freq_status === 'COMPLIANT')     freqReqs[r.required_freq].compliant++;
@@ -4453,7 +4456,7 @@ function exportHtml() {
           </tr>`).join('')}
         </tbody>
       </table>
-    </div>` : `
+    </div>` : noScopeMatch ? '' : `
     <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:10px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;gap:12px">
       <span style="font-size:24px">✅</span>
       <div><strong style="color:#16a34a">No critical gaps detected.</strong><br><span style="color:#166534;font-size:13px">All HIGH severity tasks are either covered or partially covered.</span></div>
@@ -4498,7 +4501,7 @@ function exportHtml() {
     </div>
     <div style="text-align:right">
       <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Overall Verdict</div>
-      <div style="background:${VERDICT_COLOUR};color:white;font-size:16px;font-weight:800;padding:10px 22px;border-radius:10px;letter-spacing:.03em">${escHtml(verdict)}</div>
+      <div style="background:${VERDICT_COLOUR};color:white;font-size:16px;font-weight:800;padding:10px 22px;border-radius:10px;letter-spacing:.03em">${escHtml(VERDICT_TEXT)}</div>
     </div>
   </div>
 
@@ -4541,7 +4544,7 @@ function exportHtml() {
         <circle cx="60" cy="60" r="48" fill="none" stroke="#f59e0b" stroke-width="15" transform="rotate(-90 60 60)" stroke-dasharray="0 302" id="rptPartial"/>
         <circle cx="60" cy="60" r="48" fill="none" stroke="#22c55e" stroke-width="15" transform="rotate(-90 60 60)" stroke-dasharray="0 302" id="rptCovered"/>
         <text x="60" y="57" text-anchor="middle" font-size="21" font-weight="800" fill="#0f172a" font-family="system-ui,sans-serif" id="rptPct">—</text>
-        <text x="60" y="73" text-anchor="middle" font-size="8.5" fill="#94a3b8" font-family="system-ui,sans-serif" letter-spacing="1">COVERAGE</text>
+        <text x="60" y="73" text-anchor="middle" font-size="8.5" fill="#94a3b8" font-family="system-ui,sans-serif" letter-spacing="1">WEIGHTED</text>
       </svg>
     </div>
     <!-- KPI cards -->
@@ -4599,7 +4602,7 @@ function exportHtml() {
   </div>
   <script>
   (function(){
-    var C=301.59, total=${total}, cov=${covCount}, par=${parCount}, mis=${misCount};
+    var C=301.59, total=${total}, cov=${covCount}, par=${parCount}, mis=${misCount}, weighted=${weightedPct};
     if(!total) return;
     var covD=cov/total*C, parD=par/total*C, misD=mis/total*C;
     function anim(){
@@ -4614,7 +4617,7 @@ function exportHtml() {
         if(rc)rc.style['stroke-dasharray']=covD+' '+C;
         if(rp)rp.style['stroke-dasharray']=parD+' '+C;
         if(rm)rm.style['stroke-dasharray']=misD+' '+C;
-        var pt=document.getElementById('rptPct');if(pt)pt.textContent=Math.round((cov+par)/total*100)+'%';
+        var pt=document.getElementById('rptPct');if(pt)pt.textContent=weighted+'%';
         setTimeout(function(){
           var p=function(n){return(n/total*100).toFixed(1)+'%';};
           var bc=document.getElementById('rptBCov'),bp=document.getElementById('rptBPar'),bm=document.getElementById('rptBMis');
