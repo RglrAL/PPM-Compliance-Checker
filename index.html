@@ -4255,7 +4255,9 @@ function exportJson() {
 
 function exportHtml() {
   const exportScope = allResults.filter(r => r.scope_status !== 'profile_excluded');
-  const inScope     = inScopeResults();
+  // Export always scores all in-scope tasks regardless of owner filter —
+  // the report is a full compliance picture; the Scoring toggle is a live-tool feature only.
+  const inScope     = allResults.filter(r => r.scope_status !== 'out_of_scope' && r.scope_status !== 'profile_excluded');
   const bar       = document.getElementById('summaryBar');
   const freqHits  = JSON.parse(bar.dataset.freqHits || '[]');
   const freqStr   = freqHits.length ? freqHits.map(f => f.label).join(', ') : 'None detected';
@@ -4553,6 +4555,7 @@ function exportHtml() {
   <script>
   (function(){
     var C=301.59, total=${total}, cov=${covCount}, par=${parCount}, mis=${misCount};
+    if(!total) return;
     var covD=cov/total*C, parD=par/total*C, misD=mis/total*C;
     function anim(){
       var rc=document.getElementById('rptCovered'),rp=document.getElementById('rptPartial'),rm=document.getElementById('rptMissing');
