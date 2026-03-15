@@ -662,6 +662,35 @@
                         padding:6px 12px; margin-bottom:8px; }
   .llm-unavail-notice a { color:#92400e; font-weight:600; }
 
+  /* ── LLM score delta ticker ── */
+  .llm-score-delta { display:flex; align-items:center; gap:6px; font-size:12px;
+                     background:#f5f3ff; border-radius:7px; padding:5px 12px;
+                     margin-bottom:4px; font-variant-numeric:tabular-nums; }
+  .llm-score-base  { color:#94a3b8; font-weight:400; }
+  .llm-score-sep   { color:#c4b5fd; }
+  .llm-score-live  { color:#4f46e5; font-weight:700; transition:color .4s; }
+  .llm-score-live.improved { color:#16a34a; }
+  .llm-score-delta-tag { font-size:10px; color:#6366f1; background:#ede9fe;
+                         border-radius:4px; padding:1px 6px; margin-left:2px;
+                         transition:all .3s; }
+  .llm-score-delta-tag.improved { background:#dcfce7; color:#15803d; }
+
+  /* ── LLM task pills ── */
+  .llm-task-pills { display:flex; flex-wrap:wrap; gap:3px; padding:4px 0 2px; }
+  .llm-pill { width:11px; height:11px; border-radius:2px; background:#e2e8f0;
+              flex-shrink:0; transition:background .25s; cursor:default; }
+  .llm-pill.checking { background:#a78bfa; animation:pillPulse .7s infinite alternate; }
+  .llm-pill.upgraded { background:#4ade80; }
+  .llm-pill.nochange { background:#475569; }
+  .llm-pill.cached   { background:#cbd5e1; }
+  .llm-pill.error    { background:#f87171; }
+  @keyframes pillPulse { from { opacity:.45; } to { opacity:1; } }
+
+  /* ── LLM log reasoning sub-line ── */
+  .llm-log-reasoning { font-size:10px; color:#818cf8; font-style:italic;
+                       padding:0 12px 4px 32px; line-height:1.4;
+                       animation:llmLogIn .18s ease-out; }
+
   /* D — KPI pulse on accept */
   @keyframes kpiPulse {
     0%   { transform:scale(1); }
@@ -1225,7 +1254,8 @@
         <button class="llm-slim-toggle" id="llmSlimToggle" onclick="toggleLlmDetails()" style="display:none">Show details</button>
       </div>
       <div id="llmProgressDetail">
-        <div class="llm-pbar-track"><div id="llmPbarFill" class="llm-pbar-fill"></div></div>
+        <div id="llmScoreDelta" class="llm-score-delta" style="display:none"></div>
+        <div id="llmTaskPills" class="llm-task-pills"></div>
         <div class="llm-pbar-meta">
           <span id="llmPbarLabel" class="llm-pbar-label"></span>
           <span class="llm-pbar-right">
@@ -1935,12 +1965,13 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null, i
   const btn            = document.getElementById('llmRunBtn');
   const progressEl     = document.getElementById('llmProgress');
   const detailEl       = document.getElementById('llmProgressDetail');
-  const pbarFill       = document.getElementById('llmPbarFill');
   const pbarLabel      = document.getElementById('llmPbarLabel');
   const elapsedEl      = document.getElementById('llmElapsed');
   const taskLog        = document.getElementById('llmTaskLog');
   const currentTaskEl  = document.getElementById('llmCurrentTask');
   const upgradeCountEl = document.getElementById('llmUpgradeCount');
+  const scoreDeltaEl   = document.getElementById('llmScoreDelta');
+  const pillsEl        = document.getElementById('llmTaskPills');
   const contractText   = document.getElementById('contractText').value;
   const cHash          = contractHash(contractText);
 
@@ -1959,15 +1990,72 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null, i
 
   const statusRank = { 'MISSING': 0, 'PARTIAL': 1, 'COVERED': 2 };
 
+  // Compute baseline weighted score before LLM changes anything
+  const baselineWeighted = (() => {
+    const isr = inScopeResults();
+    const t   = isr.length;
+    if (!t) return 0;
+    const cov = isr.filter(r => effectiveStatus(r) === 'COVERED').length;
+    const par = isr.filter(r => effectiveStatus(r) === 'PARTIAL').length;
+    return Math.round((cov + par * 0.5) / t * 100);
+  })();
+
   // Show progress UI: un-slim, reveal toggle, reset log
   const _llmBar = document.getElementById('llmReviewBar');
   if (_llmBar) { _llmBar.classList.remove('slim'); _llmBar.style.display = ''; }
   const _slimToggle = document.getElementById('llmSlimToggle');
   if (_slimToggle) { _slimToggle.style.display = ''; _slimToggle.textContent = 'Hide details'; }
-  taskLog.innerHTML      = '';
+  taskLog.innerHTML         = '';
   currentTaskEl.textContent = '';
   upgradeCountEl.style.display = 'none';
   upgradeCountEl.textContent   = '';
+
+  // Score delta ticker — show baseline, live slot starts equal
+  if (scoreDeltaEl) {
+    scoreDeltaEl.style.display = '';
+    scoreDeltaEl.innerHTML =
+      `<span class="llm-score-base">Keyword ${baselineWeighted}%</span>`
+    + `<span class="llm-score-sep">→</span>`
+    + `<span id="llmScoreLive" class="llm-score-live">${baselineWeighted}%</span>`
+    + `<span id="llmScoreDeltaTag" class="llm-score-delta-tag" style="display:none"></span>`;
+  }
+
+  // Task pills — one per candidate (cached + uncached)
+  if (pillsEl) {
+    pillsEl.innerHTML = '';
+    candidates.forEach(r => {
+      const pill = document.createElement('div');
+      pill.className = 'llm-pill';
+      pill.id  = 'pill-' + r.task_id.replace(/[^a-zA-Z0-9]/g, '-');
+      pill.title = r.title;
+      pillsEl.appendChild(pill);
+    });
+  }
+
+  function setPillState(taskId, state) {
+    const pill = document.getElementById('pill-' + taskId.replace(/[^a-zA-Z0-9]/g, '-'));
+    if (pill) pill.className = 'llm-pill ' + state;
+  }
+
+  function updateScoreDelta(upgradedCount) {
+    const isr  = inScopeResults();
+    const t    = isr.length;
+    if (!t) return;
+    const cov  = isr.filter(r => effectiveStatus(r) === 'COVERED').length;
+    const par  = isr.filter(r => effectiveStatus(r) === 'PARTIAL').length;
+    const live = Math.round((cov + par * 0.5) / t * 100);
+    const livEl  = document.getElementById('llmScoreLive');
+    const tagEl  = document.getElementById('llmScoreDeltaTag');
+    if (livEl) {
+      livEl.textContent = live + '%';
+      livEl.className   = 'llm-score-live' + (live > baselineWeighted ? ' improved' : '');
+    }
+    if (tagEl && upgradedCount > 0) {
+      tagEl.style.display = '';
+      tagEl.textContent   = `↑${upgradedCount} upgraded`;
+      tagEl.className     = 'llm-score-delta-tag' + (live > baselineWeighted ? ' improved' : '');
+    }
+  }
 
   // ── E: per-task log helpers ────────────────────────────────────────────────
   const taskLogMap = {};
@@ -2016,14 +2104,14 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null, i
       }
       addLogEntry(result.task_id, 'llm-log-cached', '○', result.title,
                   `${cached.status}  (cached)`);
+      setPillState(result.task_id, 'cached');
     } else {
       uncached.push(result);
     }
   }
 
   if (uncached.length === 0) {
-    pbarFill.style.width  = '100%';
-    pbarLabel.textContent = '✓ All cached';
+    pbarLabel.textContent  = '✓ All cached';
     progressEl.textContent = `All ${candidates.length} tasks loaded from cache instantly.`;
     btn.disabled = false;
     if (freshBtn) freshBtn.disabled = false;
@@ -2031,9 +2119,9 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null, i
     return;
   }
 
-  const CHUNK        = 1;
-  const totalChunks  = Math.ceil(uncached.length / CHUNK);
-  progressEl.textContent = `Reviewing ${uncached.length} tasks in ${totalChunks} batch${totalChunks > 1 ? 'es' : ''}…`;
+  const CHUNK       = 1;
+  const totalChunks = Math.ceil(uncached.length / CHUNK);
+  progressEl.textContent = `Reviewing ${uncached.length} task${uncached.length !== 1 ? 's' : ''}…`;
 
   // Braille spinner — all checking entries share one timer, animate in sync
   const SPIN_FRAMES = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
@@ -2053,27 +2141,9 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null, i
     elapsedEl.textContent = fmt(Date.now() - startTime) + ' elapsed';
   }, 500);
 
-  // Simulated intra-batch progress (asymptotic crawl)
-  let _rafId = null;
-  function startFakeProgress(fromPct, toPct, batchLabel) {
-    const segSize    = toPct - fromPct;
-    const batchStart = Date.now();
-    const TAU        = 55000;
-    pbarFill.classList.add('running');
-    function tick() {
-      const elapsed = Date.now() - batchStart;
-      const simPct  = fromPct + segSize * 0.95 * (1 - Math.exp(-elapsed / TAU));
-      pbarFill.style.width    = simPct.toFixed(1) + '%';
-      pbarLabel.textContent   = batchLabel;
-      _rafId = requestAnimationFrame(tick);
-    }
-    _rafId = requestAnimationFrame(tick);
-  }
-  function stopFakeProgress(snapToPct) {
-    if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
-    pbarFill.classList.remove('running');
-    pbarFill.style.width = snapToPct + '%';
-  }
+  // Track whether user scrolled the log (pauses auto-collapse)
+  let _userScrolled = false;
+  taskLog.addEventListener('scroll', () => { _userScrolled = true; }, { passive: true });
 
   let upgraded = 0;
   let reviewed = 0;
@@ -2081,14 +2151,14 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null, i
   for (let i = 0; i < uncached.length; i += CHUNK) {
     const chunkIdx = Math.floor(i / CHUNK);
     const chunk    = uncached.slice(i, i + CHUNK);
-    const fromPct  = Math.round((i / uncached.length) * 100);
-    const toPct    = Math.round(((i + chunk.length) / uncached.length) * 100);
 
-    startFakeProgress(fromPct, toPct,
-      `Batch ${chunkIdx + 1} of ${totalChunks} — ${llmStatus.model} thinking…`);
+    pbarLabel.textContent = `${chunkIdx + 1} / ${totalChunks} — ${llmStatus.model} thinking…`;
 
     // E — add checking entries to log (spinner icon)
-    chunk.forEach(r => addLogEntry(r.task_id, 'llm-log-checking', 'spin', r.title, 'checking…'));
+    chunk.forEach(r => {
+      addLogEntry(r.task_id, 'llm-log-checking', 'spin', r.title, 'checking…');
+      setPillState(r.task_id, 'checking');
+    });
 
     // B — highlight rows being scanned
     const scanRows = chunk.map(r => {
@@ -2146,49 +2216,70 @@ async function runSemanticReview(autoTrigger = false, targetCandidates = null, i
               upgraded++;
               chunkUpgrades++;
               upgradeCountEl.style.display = '';
-              upgradeCountEl.textContent   = `✦ ${upgraded} change${upgraded !== 1 ? 's' : ''} found`;
-              // E — update log entry
-              updateLogEntry(r.task_id, 'llm-log-upgraded', '✦', `→ ${item.status} ✓`);
+              upgradeCountEl.textContent   = `✦ ${upgraded} change${upgraded !== 1 ? 's' : ''}`;
+              setPillState(r.task_id, 'upgraded');
+              updateLogEntry(r.task_id, 'llm-log-upgraded', '✦', `→ ${item.status}`);
+              // Reasoning snippet — truncate at 80 chars
+              if (item.reasoning) {
+                const snippet = item.reasoning.length > 80
+                  ? item.reasoning.slice(0, 80) + '…'
+                  : item.reasoning;
+                const sub = document.createElement('div');
+                sub.className   = 'llm-log-reasoning';
+                sub.textContent = '"' + snippet + '"';
+                const entry = taskLogMap[r.task_id];
+                if (entry) entry.after(sub);
+              }
+              updateScoreDelta(upgraded);
             } else {
-              // E — no change
+              setPillState(r.task_id, 'nochange');
               updateLogEntry(r.task_id, 'llm-log-nochange', '·', 'no change');
             }
           } else {
+            setPillState(r.task_id, 'nochange');
             updateLogEntry(r.task_id, 'llm-log-nochange', '·', 'no change');
           }
         }
       }
     } catch (_) {
-      // E — mark all tasks in this batch as errored
-      chunk.forEach(r => updateLogEntry(r.task_id, 'llm-log-error', '✗', 'error'));
+      chunk.forEach(r => {
+        setPillState(r.task_id, 'error');
+        updateLogEntry(r.task_id, 'llm-log-error', '✗', 'error');
+      });
     }
 
     // B — remove scanning highlight
     scanRows.forEach(tr => tr.classList.remove('llm-scanning'));
-    stopFakeProgress(toPct);
     reviewed += chunk.length;
   }
 
   clearInterval(elapsedTimer);
   clearInterval(spinTimer);
-  stopFakeProgress(100);
+  const totalTime = fmt(Date.now() - startTime);
   pbarLabel.textContent     = '✓ Complete';
-  elapsedEl.textContent     = fmt(Date.now() - startTime) + ' total';
+  elapsedEl.textContent     = totalTime + ' total';
   currentTaskEl.textContent = '';
-  progressEl.textContent    = `AI review complete — ${upgraded} change${upgraded !== 1 ? 's' : ''} applied.`;
+  const changeWord = upgraded !== 1 ? 'changes' : 'change';
+  progressEl.textContent = upgraded > 0
+    ? `AI review complete — ${upgraded} ${changeWord} applied · ${totalTime}`
+    : `AI review complete — no changes · ${totalTime}`;
   btn.disabled = false;
   if (freshBtn) freshBtn.disabled = false;
   _llmRunning = false;
   refreshSummary();
   applyFilter();
   runLlmSummary(); // fire-and-forget — populates llmSummaryText for export
-  // Auto-dismiss slim bar after 5s unless user opened details
+
+  // Collapse to slim summary after run — don't hide, so reasoning is readable
+  // Delay slightly to let final animations settle; skip if user scrolled the log
   const _bar = document.getElementById('llmReviewBar');
-  if (_bar && _bar.classList.contains('slim')) {
-    setTimeout(() => {
-      if (_bar.classList.contains('slim')) _bar.style.display = 'none';
-    }, 5000);
-  }
+  setTimeout(() => {
+    if (_bar && !_userScrolled) {
+      _bar.classList.add('slim');
+      const tog = document.getElementById('llmSlimToggle');
+      if (tog) { tog.style.display = ''; tog.textContent = 'Show details'; }
+    }
+  }, 3000);
 }
 
 function applyLlmSuggestion(taskId, status, reasoning, keySentences) {
