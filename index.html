@@ -4285,9 +4285,24 @@ function exportHtml() {
   const weightedPct = total > 0
     ? Math.round((covCount * 1.0 + parCount * 0.5) / total * 100)
     : 0;
-  const highAbsentCount   = highMiss.filter(r => !r.evidence || r.evidence.length === 0).length;
+  const highAbsentCount = highMiss.filter(r => !r.evidence || r.evidence.length === 0).length;
+
+  // Frequency risk — computed here so it can feed into the verdict description
+  const freqRiskTasks = inScope.filter(r =>
+    effectiveStatus(r) !== 'MISSING' && r.freq_status === 'NON_COMPLIANT'
+  );
+  const freqRiskHigh = freqRiskTasks.filter(r => r.criticality_norm === 'HIGH');
+  const freqRiskSentence = (() => {
+    if (freqRiskHigh.length === 0) return '';
+    const tiers = [...new Set(freqRiskHigh.map(r => r.required_freq).filter(Boolean))].sort();
+    const tierStr = tiers.length <= 2
+      ? tiers.join(' and ')
+      : tiers.slice(0, -1).join(', ') + ' and ' + tiers.at(-1);
+    return ` Additionally, ${freqRiskHigh.length} HIGH criticality task${freqRiskHigh.length > 1 ? 's are' : ' is'} covered but at insufficient frequency — the contract must add ${tierStr} maintenance obligations before it can be accepted.`;
+  })();
+
   const VERDICT_DESC =
-    reason === 'acceptable'
+    (reason === 'acceptable'
       ? `This contract meets the minimum PPM compliance threshold (weighted coverage ${weightedPct}% ≥ 80%). PARTIAL tasks count as half-credit in this score. Review all PARTIAL items before finalising.`
     : reason === 'needs_negotiation'
       ? `This contract has a weighted coverage score of ${weightedPct}% (below the 80% threshold — PARTIAL tasks count as half-credit). Negotiate the highlighted PARTIAL and MISSING items before acceptance.`
@@ -4296,7 +4311,8 @@ function exportHtml() {
     : reason === 'high_missing_multiple'
       ? `This contract has ${highMiss.length} HIGH severity tasks unresolved (MISSING). Even where near-match language exists, the obligation is not clearly evidenced. These must be explicitly covered before acceptance.`
     : /* low_coverage */
-      `This contract has a weighted coverage score of ${weightedPct}% — below the minimum 60% threshold. Overall scope is insufficient and must be significantly expanded before acceptance.`;
+      `This contract has a weighted coverage score of ${weightedPct}% — below the minimum 60% threshold. Overall scope is insufficient and must be significantly expanded before acceptance.`
+    ) + freqRiskSentence;
 
   const statusIcon = s => s === 'COVERED' ? '✅' : s === 'PARTIAL' ? '⚠️' : '❌';
   const statusCol  = s => s === 'COVERED' ? '#16a34a' : s === 'PARTIAL' ? '#d97706' : '#dc2626';
@@ -4313,12 +4329,6 @@ function exportHtml() {
       else                                         freqReqs[r.required_freq].unknown++;
     }
   }
-  // Tasks that are COVERED/PARTIAL but frequency is non-compliant — a hidden risk
-  const freqRiskTasks = inScope.filter(r =>
-    effectiveStatus(r) !== 'MISSING' && r.freq_status === 'NON_COMPLIANT'
-  );
-  const freqRiskHigh = freqRiskTasks.filter(r => r.criticality_norm === 'HIGH');
-
   const freqTableRows = Object.values(freqReqs).map(f => `
     <tr>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600">${escHtml(f.label)}</td>
